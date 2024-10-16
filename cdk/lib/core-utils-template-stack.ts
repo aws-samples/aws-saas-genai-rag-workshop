@@ -97,5 +97,9 @@ export class CoreUitlsTemplateStack extends Stack {
     this.codeBuildProject = provisioningJobRunner.codebuildProject;
 
     // TODO: Lab1 - Add SBT core utils component
+    new CoreApplicationPlane(this, "CoreApplicationPlane", {
+      eventManager: props.controlPlane.eventManager,
+      jobRunnersList: [provisioningJobRunner],
+    });
   }
 }

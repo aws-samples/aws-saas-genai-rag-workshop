@@ -33,6 +33,11 @@ export class ControlPlaneStack extends Stack {
     });
 
     // TODO: Lab1 - Add SBT Control plane
+    const controlPlane = new ControlPlane(this, "ControlPlane", {
+      auth: customCognitoAuth,
+      systemAdminEmail: systemAdminEmail,
+    });
+    this.controlPlane = controlPlane;
 
     this.regApiGatewayUrl = controlPlane.controlPlaneAPIGatewayUrl;
     this.controlPlane = controlPlane;

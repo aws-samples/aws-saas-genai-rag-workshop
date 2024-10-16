@@ -72,6 +72,30 @@ export class BootstrapTemplateStack extends Stack {
 
     // TODO: Lab1 - Add pooled resources
 
+    const collection = new opensearchserverless.VectorCollection(
+      this,
+      "SaaSGenAIWorkshopVectorCollection"
+    );
+
+    const s3Bucket = new Bucket(this, "SaaSGenAIWorkshopBucket", {
+      autoDeleteObjects: true,
+      removalPolicy: RemovalPolicy.DESTROY,
+      eventBridgeEnabled: true,
+    });
+
+    const api = new ApiGateway(this, "SaaSGenAIWorkshopRestApi", {});
+
+    const services = new Services(this, "SaaSGenAIWorkshopServices", {
+      appClientID: app_client_id,
+      userPoolID: userPoolID,
+      s3Bucket: s3Bucket,
+      tenantTokenUsageTable: tenantTokenUsage.tenantTokenUsageTable,
+      restApi: api.restApi,
+      controlPlaneApiGwUrl: props.controlPlaneApiGwUrl,
+      lambdaPowerToolsLayer: lambdaPowerToolsLayer,
+      utilsLayer: utilsLayer,
+    });
+
     const coreUtilsStack = props.coreUtilsStack;
 
     // Access the codeBuildProject instance from the coreUtilsStack
