@@ -1,0 +1,3 @@
+opensearch-py
+boto3>=1.34.91
+aws-lambda-powertools[Logger]
