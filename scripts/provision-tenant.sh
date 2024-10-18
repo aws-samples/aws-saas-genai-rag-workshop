@@ -72,9 +72,7 @@ check_error() {
 pip3 install -r lib/tenant-template/tenant-provisioning/requirements.txt
 
 provision_name="Tenant Provisioning"
-# TODO: Lab1 - Uncomment below lines - tenant provisioning service 
-# tenant_provision_output=$(python3 lib/tenant-template/tenant-provisioning/tenant_provisioning_service.py --tenantid "$CDK_PARAM_TENANT_ID" 2>&1 > /dev/null && exit_code=$?) || exit_code=$?
-# check_error "$provision_name" $exit_code "$tenant_provision_output" 
+# TODO: Lab1 - Add tenant provisioning service
 
 export KNOWLEDGE_BASE_NAME=$CDK_PARAM_TENANT_ID
 

@@ -93,6 +93,7 @@ def lambda_handler(event, context):
         # knowledge_base_id = "<hardcode knowledge base id>"
         # logger.info(f"hard coded knowledge base id: {knowledge_base_id}")
         
+        
         if 'body' not in event:
             raise ValueError('No query provided')
         
