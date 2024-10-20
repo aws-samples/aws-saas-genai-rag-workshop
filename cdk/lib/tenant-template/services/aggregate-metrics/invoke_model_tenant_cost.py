@@ -91,7 +91,9 @@ class InvokeModelTenantCost():
         for row in result['ResultSet']['Rows'][1:]:
             line_item = row['Data'][0]['VarCharValue']
             cost = Decimal(row['Data'][1]['VarCharValue'])
-            # TODO: Get total input and output tokens cost
+            # TODO: Lab4 - Get total input and output tokens cost
+            
+            
             
             
         logger.info(total_service_cost_dict)
@@ -121,10 +123,10 @@ class InvokeModelTenantCost():
 
             tenant_attribution_percentage_json = json.loads(tenant_attribution_percentage)
 
-            # TODO: Calculate tenant cost for ingesting & retrieving tenant data to/from Amazon Bedrock Knowledge Base
+            # TODO: Lab4 - Calculate tenant cost for ingesting & retrieving tenant data to/from Amazon Bedrock Knowledge Base
             tenant_kb_input_tokens_cost = 0
             
-            # TODO: Calculate tenant cost for generating final tenant specific response
+            # TODO: Lab4 - Calculate tenant cost for generating final tenant specific response
             tenant_input_tokens_cost = 0
             tenant_output_tokens_cost = 0
 
@@ -200,16 +202,14 @@ class InvokeModelTenantCost():
     
     def __get_tenant_kb_attribution(self, log_group_names, tenant_attribution_dict):
 
-        #TODO: Add Amazon CloudWatch logs insights queries to get knowledge base input tokens
-
+        #TODO: Lab4 - Add Amazon CloudWatch logs insights queries to get knowledge base input tokens
         knowledgebase_input_tokens_query = ""
         
         
         knowledgebase_input_tokens_resultset = self.__query_cloudwatch_logs(log_group_names, knowledgebase_input_tokens_query)
 
 
-        # TODO: Add Amazon CloudWatch logs insights queries to get total knowledge base input tokens
-
+        # TODO: Lab4 - Add Amazon CloudWatch logs insights queries to get total knowledge base input tokens
         total_knowledgebase_input_tokens_query = ""
         
         total_knowledgebase_input_tokens_resultset = self.__query_cloudwatch_logs(log_group_names, total_knowledgebase_input_tokens_query)
@@ -231,19 +231,19 @@ class InvokeModelTenantCost():
                     if 'TotalInputTokens' in field['field']:
                         input_tokens = Decimal(field['value'])
 
-                # TODO: Calculate the percentage of tenant attribution for knowledge base input tokens
+                # TODO: Lab4 - Calculate the percentage of tenant attribution for knowledge base input tokens
                 tenant_kb_input_tokens_attribution_percentage = 0
                 self.__add_or_update_dict(tenant_attribution_dict, tenant_id,EMBEDDING_TITAN_INPUT_TOKENS_LABEL, tenant_kb_input_tokens_attribution_percentage)
 
     
     def __get_tenant_converse_attribution(self, log_group_names, tenant_attribution_dict):
         
-        # TODO: Add Amazon CloudWatch logs insights queries for converse input output tokens
+        # TODO: Lab4 - Add Amazon CloudWatch logs insights queries for converse input output tokens
         converse_input_output_tokens_query = ""
         
         converse_input_output_tokens = self.__query_cloudwatch_logs(log_group_names, converse_input_output_tokens_query)
 
-        # TODO: Add Amazon CloudWatch logs insights queries to get total converse input output tokens
+        # TODO: Lab4 - Add Amazon CloudWatch logs insights queries to get total converse input output tokens
         total_converse_input_output_tokens_query = ""
         
         total_converse_input_output_tokens = self.__query_cloudwatch_logs(log_group_names, total_converse_input_output_tokens_query)
@@ -271,8 +271,7 @@ class InvokeModelTenantCost():
                         if 'TotalOutputTokens' in field['field']:
                             tenant_output_tokens = Decimal(field['value'])
 
-                    # TODO: Calculate the percentage of tenant attribution for converse input and output tokens
-
+                    # TODO: Lab4 - Calculate the percentage of tenant attribution for converse input and output tokens
                     tenant_attribution_input_tokens_percentage = 0
                     tenant_attribution_output_tokens_percentage = 0
                     
