@@ -882,6 +882,7 @@ Resources:
                   - sts:AssumeRole
                   - aoss:CreateAccessPolicy
                   - aoss:APIAccessAll
+                  - aoss:BatchGetCollection
                 Resource: '*'
 
   VSCodeInstanceProfile:
