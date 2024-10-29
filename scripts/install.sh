@@ -30,23 +30,6 @@ CP_API_GATEWAY_URL=$(aws cloudformation describe-stacks --stack-name ControlPlan
 
 echo "Control plane api gateway url: $CP_API_GATEWAY_URL"
 
-# Temporary local CodeCommit creation until solution public
-
-## Create Codecommit repository
-# export CDK_PARAM_CODE_COMMIT_REPOSITORY_NAME="saas-genai-workshop"
-# if ! aws codecommit get-repository --repository-name $CDK_PARAM_CODE_COMMIT_REPOSITORY_NAME; then
-#  echo "$CDK_PARAM_CODE_COMMIT_REPOSITORY_NAME codecommit repo is not present, will create one now"
-#  CREATE_REPO=$(aws codecommit create-repository --repository-name $CDK_PARAM_CODE_COMMIT_REPOSITORY_NAME --repository-description "SaaS GenAI Workshop repository")
-#  echo "$CREATE_REPO"
-# fi
-
-# REPO_URL="codecommit::${REGION}://$CDK_PARAM_CODE_COMMIT_REPOSITORY_NAME"
-# if ! git remote add dd "$REPO_URL"; then
-#  echo "Setting url to remote dd"
-#  git remote set-url dd "$REPO_URL"
-# fi
-# git defender --setup
-# git push dd "$(git branch --show-current)":main
 
 S3_TENANT_SOURCECODE_BUCKET_URL=$(aws cloudformation describe-stacks --stack-name saas-genai-workshop-bootstrap-template --query "Stacks[0].Outputs[?OutputKey=='TenantSourceCodeS3Bucket'].OutputValue" --output text)
 echo "S3 bucket url: $S3_TENANT_SOURCECODE_BUCKET_URL"
@@ -57,6 +40,6 @@ FOLDER_PATH="$(dirname "$SCRIPT_DIR")"       # Get the parent folder of the scri
 
 # Step 4: Upload the folder to the S3 bucket
 echo "Uploading folder $FOLDER_PATH to S3 $S3_TENANT_SOURCECODE_BUCKET_URL"
-aws s3 cp "$FOLDER_PATH" "s3://$S3_TENANT_SOURCECODE_BUCKET_URL" --recursive --exclude "cdk.out/*" --exclude "node_modules/*" --exclude ".git/*"
+aws s3 cp "$FOLDER_PATH" "s3://$S3_TENANT_SOURCECODE_BUCKET_URL" --recursive --exclude "cdk/cdk.out/*" --exclude "cdk/node_modules/*" --exclude ".git/*"
 
 echo "Installation completed successfully"

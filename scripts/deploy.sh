@@ -8,14 +8,12 @@ fi
 # Get the stack name from command line argument
 STACK_NAME="$1"
 
-FOLDER_PATH="$(dirname "$SCRIPT_DIR")"       # Get the parent folder of the script
-
 # Step 2: Upload the updated code to the S3 bucket which reads by the provision-tenant.sh
 S3_TENANT_SOURCECODE_BUCKET_URL=$(aws cloudformation describe-stacks --stack-name saas-genai-workshop-bootstrap-template --query "Stacks[0].Outputs[?OutputKey=='TenantSourceCodeS3Bucket'].OutputValue" --output text)
 echo "S3 bucket url: $S3_TENANT_SOURCECODE_BUCKET_URL"
 
 cd ..
-aws s3 cp "$FOLDER_PATH" "s3://$S3_TENANT_SOURCECODE_BUCKET_URL" --recursive --exclude "cdk.out/*" --exclude "node_modules/*" --exclude ".git/*"
+aws s3 cp "." "s3://$S3_TENANT_SOURCECODE_BUCKET_URL" --recursive --exclude "cdk/cdk.out/*" --exclude "cdk/node_modules/*" --exclude ".git/*"
 
 # Step 2: Deploys the tenant-template.stack
 
