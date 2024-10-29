@@ -672,6 +672,8 @@ Resources:
                 - !Sub echo 'alias pip=pip3.11' >> /home/${VSCodeUser}/.bashrc
                 - !Sub source /home/${VSCodeUser}/.bashrc
                 - python3.11 -m pip install boto3 2>&1
+                - python3.11 -m pip install opensearch-py 2>&1
+                - python3.11 -m pip install requests_aws4auth 2>&1
                 - python3.11 -m pip install --upgrade pip 2>&1
                 - echo "Python and Pip installed. Checking configuration"
                 - python3.11 --version
@@ -893,6 +895,8 @@ Resources:
                   - ssm:DeleteParameter
                   - logs:DeleteLogGroup
                   - sts:AssumeRole
+                  - aoss:CreateAccessPolicy
+                  - aoss:APIAccessAll
                 Resource: '*'
 
   VSCodeInstanceProfile:
@@ -1182,3 +1186,8 @@ Outputs:
     Value: !GetAtt SecretPlaintext.password
     Export:
       Name: !Sub ${AWS::StackName}-Password
+  VSCodeInstanceProfile:
+      Description: VSCode-Server Instance Profile
+      Value: !Ref VSCodeInstanceProfile
+      Export:
+        Name: !Sub ${AWS::StackName}-InstanceProfile
