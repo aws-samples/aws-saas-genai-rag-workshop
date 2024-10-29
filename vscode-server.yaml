@@ -95,18 +95,6 @@ Metadata:
 
 Mappings:
   AWSRegions2PrefixListID:
-    ap-northeast-1:
-      PrefixList: pl-58a04531
-    ap-northeast-2:
-      PrefixList: pl-22a6434b
-    ap-south-1:
-      PrefixList: pl-9aa247f3
-    ap-southeast-1:
-      PrefixList: pl-31a34658
-    ap-southeast-2:
-      PrefixList: pl-b8a742d1
-    ca-central-1:
-      PrefixList: pl-38a64351
     eu-central-1:
       PrefixList: pl-a3a144ca
     eu-north-1:
@@ -117,8 +105,6 @@ Mappings:
       PrefixList: pl-93a247fa
     eu-west-3:
       PrefixList: pl-75b1541c
-    sa-east-1:
-      PrefixList: pl-5da64334
     us-east-1:
       PrefixList: pl-3b927c52
     us-east-2:
@@ -199,8 +185,7 @@ Resources:
                 cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData={}, reason='No action to take')
               else:
                 secret_name = (event['ResourceProperties']['SecretArn'])
-                secrets_mgr = boto3.client('secretsmanager')
-                secret = secrets_mgr.get_secret_value(SecretId = secret_name)
+                secret = boto3.client('secretsmanager').get_secret_value(SecretId = secret_name)
                 logger.info('Getting secret from %s', secret_name)
                 secret_value = secret['SecretString']
                 logger.debug('secret_value: %s', secret_value)
@@ -215,7 +200,7 @@ Resources:
             except Exception as e:
               cfnresponse.send(event, context, cfnresponse.FAILED, responseData={}, reason=str(e))
 
-  ########### SSM Resources ###########
+  ###### SSM Resources ######
   RunSSMDocCustom:
     Type: Custom::RunSSMDocLambda
     Properties:
@@ -672,6 +657,8 @@ Resources:
                 - !Sub echo 'alias pip=pip3.11' >> /home/${VSCodeUser}/.bashrc
                 - !Sub source /home/${VSCodeUser}/.bashrc
                 - python3.11 -m pip install boto3 2>&1
+                - python3.11 -m pip install opensearch-py 2>&1
+                - python3.11 -m pip install requests_aws4auth 2>&1
                 - python3.11 -m pip install --upgrade pip 2>&1
                 - echo "Python and Pip installed. Checking configuration"
                 - python3.11 --version
@@ -837,7 +824,7 @@ Resources:
       LogGroupName: !Sub /aws/ssm/${VSCodeSSMDoc}
       RetentionInDays: 7
 
-  ########### EC2 Resources ###########
+  ###### EC2 Resources ######
   VSCodeInstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -865,6 +852,10 @@ Resources:
                 Action:
                   - cloudformation:DescribeStacks
                   - cloudformation:ListStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DeleteStack
+                  - cloudformation:GetTemplate
+                  - cloudformation:*ChangeSet
                   - cognito-idp:ListUserPools
                   - cognito-idp:DeleteUserPool
                   - cognito-idp:DescribeUserPool
@@ -879,10 +870,6 @@ Resources:
                   - ssm:ListInstanceAssociations
                   - ssm:UpdateInstanceInformation
                   - sts:GetCallerIdentity
-                  - cloudformation:*ChangeSet
-                  - cloudformation:DescribeStackEvents
-                  - cloudformation:DeleteStack
-                  - cloudformation:GetTemplate
                   - ecr:*
                   - iam:GetRole
                   - iam:DeleteRole
@@ -893,6 +880,9 @@ Resources:
                   - ssm:DeleteParameter
                   - logs:DeleteLogGroup
                   - sts:AssumeRole
+                  - aoss:CreateAccessPolicy
+                  - aoss:APIAccessAll
+                  - aoss:BatchGetCollection
                 Resource: '*'
 
   VSCodeInstanceProfile:
@@ -928,7 +918,7 @@ Resources:
       - Key: Name
         Value: !Ref InstanceName
 
-  ########### CloudFront Resources ###########
+  ###### CloudFront Resources ######
   VSCodeInstanceCachePolicy:
     Type: AWS::CloudFront::CachePolicy
     Properties:
@@ -1006,7 +996,7 @@ Resources:
             CustomOriginConfig:
               OriginProtocolPolicy: http-only
 
-  ########### SecurityGroup Resources ###########
+  ###### SG Resources ######
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Metadata:

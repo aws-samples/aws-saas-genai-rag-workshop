@@ -126,14 +126,14 @@ refresh_tokens() {
     echo "Refreshing tokens..."
   fi
 
-  generate_credentials "$ADMIN_USER_PASSWORD"
+  generate_credentials "$ADMIN_USER_PASSWORD" "$ADMIN_USER_NAME"
   CONTROL_PLANE_API_ENDPOINT=$(aws cloudformation describe-stacks \
     --stack-name "$CONTROL_PLANE_STACK_NAME" \
     --query "Stacks[0].Outputs[?contains(OutputKey,'controlPlaneAPIEndpoint')].OutputValue" \
     --output text)
 
-  printf "CONTROL_PLANE_STACK_NAME=%s\nCONTROL_PLANE_API_ENDPOINT=%s\nADMIN_USER_PASSWORD=\'%s\'\nACCESS_TOKEN=%s\nID_TOKEN=%s\n" \
-    "$CONTROL_PLANE_STACK_NAME" "$CONTROL_PLANE_API_ENDPOINT" "$ADMIN_USER_PASSWORD" "$ACCESS_TOKEN" "$ID_TOKEN"  >"$CONFIG_FILE"
+  printf "CONTROL_PLANE_STACK_NAME=%s\nCONTROL_PLANE_API_ENDPOINT=%s\nADMIN_USER_PASSWORD=\'%s\'\nADMIN_USER_NAME=%s\nACCESS_TOKEN=%s\nID_TOKEN=%s\n" \
+    "$CONTROL_PLANE_STACK_NAME" "$CONTROL_PLANE_API_ENDPOINT" "$ADMIN_USER_PASSWORD" "$ADMIN_USER_NAME" "$ACCESS_TOKEN" "$ID_TOKEN"  >"$CONFIG_FILE"
 
   if $DEBUG; then
     echo "Tokens refreshed and saved to $CONFIG_FILE"
