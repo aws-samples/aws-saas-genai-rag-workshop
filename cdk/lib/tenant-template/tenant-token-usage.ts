@@ -93,7 +93,7 @@ export class TenantTokenUsage extends Construct {
     );
 
     const rule = new events.Rule(this, "TenantTokenUsageScheduleRule", {
-      schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
+      schedule: events.Schedule.rate(cdk.Duration.minutes(1)),
     });
 
     // Add the Lambda function as a target of the rule
