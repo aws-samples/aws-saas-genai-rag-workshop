@@ -55,7 +55,7 @@ def __add_data_access_policy(kb_collection):
             policy=json.dumps(__generate_data_access_policy(iam_role_arn, kb_collection_name)),
             type='data')
 
-        print(f'Participant data access policy created: {response}')
+        print(f'Participant data access policy created')
     except boto3.exceptions.botocore.exceptions.ClientError as e:
         error_code = e.response['Error']['Code']
         if error_code == 'ConflictException':
@@ -110,9 +110,7 @@ def get_index_sizes(kb_collection):
 
     # Get all indexes in the collection
     indices = client.cat.indices(format='json')
-    
-    print(indices)
-    
+
     ## Print index name and data size
     for index in indices:
         index_name = index['index']

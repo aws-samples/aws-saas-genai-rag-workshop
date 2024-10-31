@@ -7,10 +7,9 @@ import argparse
 import time
 from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 import os
-from aws_lambda_powertools import Logger
+import logging
 import uuid
 import sys
-logger = Logger()
 
 
 # HOST=os.environ['OPENSEARCH_SERVERLESS_ENDPOINT']
@@ -45,7 +44,7 @@ def provision_tenant_resources(tenant_id):
         __api_gw_add_api_key(tenant_id)
         return 0
     except Exception as e:
-        logger.error('Error occured while provisioning tenant resources', e) 
+        logging.error('Error occured while provisioning tenant resources', e) 
         return 1
 
 # Function adding api key to existing api gateway usage plan
@@ -66,10 +65,10 @@ def __api_gw_add_api_key(tenant_id):
             keyId=api_key,
             keyType='API_KEY'
         )
-        logger.info(f'API key {api_key} added to usage plan {usage_plan_id}')
+        logging.info(f'API key {api_key} added to usage plan {usage_plan_id}')
         return 0
     except Exception as e:
-        logger.error('Error occured while adding api key to api gateway usage plan', e)
+        logging.error('Error occured while adding api key to api gateway usage plan', e)
         return 1
     
 def __get_opensearch_serverless_collection_details():
@@ -79,10 +78,10 @@ def __get_opensearch_serverless_collection_details():
             ids=[kb_collection_id]
         )
         
-        logger.info(f'OpenSearch serverless collection details: {kb_collection}')
+        logging.info(f'OpenSearch serverless collection details: {kb_collection}')
         return kb_collection['collectionDetails'][0]
     except Exception as e:
-        logger.error('Error occured while getting OpenSearch serverless collection details', e)
+        logging.error('Error occured while getting OpenSearch serverless collection details', e)
         raise Exception('Error occured while getting OpenSearch serverless collection details') from e
     
 def __create_tenant_knowledge_base(tenant_id, kb_collection_name, rule_name):
@@ -106,7 +105,7 @@ def __create_tenant_knowledge_base(tenant_id, kb_collection_name, rule_name):
         __add_data_access_policy(tenant_id, tenant_kb_role_arn, kb_collection_name)
         
         # Wait for the IAM role to be created
-        logger.info(f'Waiting for IAM role "bedrock-kb-role-{tenant_id}" to be created...')
+        logging.info(f'Waiting for IAM role "bedrock-kb-role-{tenant_id}" to be created...')
         time.sleep(10)
 
         # Retries to handle delay in indexes or Data Access Policies to be available. Indexes and Data Access Policy could take few seconds to be available to Bedrock KB.
@@ -126,28 +125,28 @@ def __create_tenant_knowledge_base(tenant_id, kb_collection_name, rule_name):
                     },
                     storageConfiguration=storage_configuration
                 );
-                logger.info(f'Tenant knowledge base created: {response}')
+                logging.info(f'Tenant knowledge base created: {response}')
             except bedrock_agent_client.exceptions.ValidationException as e:
                 error_message = e.response['Error']['Message']
-                logger.error(f'{error_message}. Retrying in 5 seconds')
+                logging.error(f'{error_message}. Retrying in 5 seconds')
                 time.sleep(5)
                 num_retries += 1
             except bedrock_agent_client.exceptions.ConflictException:
-                logger.info(f"Knowledge base '{tenant_id}' already exists, skipping creation.")
+                logging.info(f"Knowledge base '{tenant_id}' already exists, skipping creation.")
                 break
             except Exception as e:
-                logger.error('Error occurred while creating tenant knowledge base', e)
+                logging.error('Error occurred while creating tenant knowledge base', e)
                 raise Exception('Error occurred while creating tenant knowledge base') from e
         else:
-            logger.error('Maximum number of retries reached, giving up.')
+            logging.error('Maximum number of retries reached, giving up.')
             raise Exception('Error occurred while creating tenant knowledge base: Maximum number of retries reached')
         knowledge_base_id = response['knowledgeBase']['knowledgeBaseId']
-        logger.info(knowledge_base_id)
+        logging.info(knowledge_base_id)
         datasource_id = __create_tenant_data_source(tenant_id, knowledge_base_id)
         __create_eventbridge_tenant_rule_target(tenant_id, knowledge_base_id, rule_name, datasource_id)
 
     except Exception as e:
-        logger.error('Error occured while creating tenant knowledge base', e)
+        logging.error('Error occured while creating tenant knowledge base', e)
         raise Exception('Error occured while creating tenant knowledge base') from e
 
 # Create Data Source in S3 per Tenant
@@ -177,7 +176,7 @@ def __create_tenant_kb_role(tenant_id):
                 AssumeRolePolicyDocument=json.dumps(__get_kb_trust_policy()))
         except Exception as e:
             if e.response['Error']['Code'] == 'EntityAlreadyExists':
-                logger.info (f"IAM role 'bedrock-kb-role-{tenant_id}' already exists, skipping creation.")
+                logging.info (f"IAM role 'bedrock-kb-role-{tenant_id}' already exists, skipping creation.")
                 response = iam_client.get_role(
                     RoleName=f'bedrock-kb-role-{tenant_id}')
         
@@ -186,11 +185,11 @@ def __create_tenant_kb_role(tenant_id):
             PolicyName=f'bedrock-kb-policy-{tenant_id}',
             PolicyDocument=json.dumps(__get_kb_policy(tenant_id))
         )
-        logger.info(f"Tenant knowledge base role created: {response['Role']['Arn']}")
+        logging.info(f"Tenant knowledge base role created: {response['Role']['Arn']}")
         return response['Role']['Arn']
 
     except Exception as e:
-        logger.error('Error occured while creating tenant knowledge base role', e)
+        logging.error('Error occured while creating tenant knowledge base role', e)
         raise Exception('Error occured while creating tenant knowledge base role') from e
     
 # Function creating a Data Access Policy per tenant
@@ -208,10 +207,10 @@ def __add_data_access_policy(tenant_id, tenant_kb_role_arn, kb_collection_name):
             policy=json.dumps(__generate_data_access_policy(tenant_id, tenant_kb_role_arn, kb_collection_name)),
             type='data')
 
-        logger.info(f'Tenant data access policy created: {response}')
+        logging.info(f'Tenant data access policy created: {response}')
         
     except Exception as e: 
-        logger.error('Error occured while adding data access policy', e)
+        logging.error('Error occured while adding data access policy', e)
         raise Exception('Error occured while adding data access policy') from e    
 
 def __create_s3_tenant_prefix(tenant_id, rule_name):
@@ -220,11 +219,11 @@ def __create_s3_tenant_prefix(tenant_id, rule_name):
         s3.put_object(Bucket=S3_BUCKET, Key=prefix)
         rule_arn=__create_eventbridge_tenant_rule(prefix, tenant_id, rule_name)
         __create_trigger_lambda_eventbridge_permissions(rule_arn)
-        logger.info(f'S3 tenant prefix created for tenant {tenant_id}')
+        logging.info(f'S3 tenant prefix created for tenant {tenant_id}')
         return rule_name
     
     except Exception as e:
-        logger.error('Error occured while creating S3 tenant prefix', e)
+        logging.error('Error occured while creating S3 tenant prefix', e)
         raise Exception('Error occured while creating S3 tenant prefix') from e     
     
 def __create_eventbridge_tenant_rule(prefix, tenant_id, rule_name):
@@ -250,12 +249,12 @@ def __create_eventbridge_tenant_rule(prefix, tenant_id, rule_name):
             State='ENABLED'
         )
 
-        logger.info(f'Eventbridge Rule Created for tenant {tenant_id}')
+        logging.info(f'Eventbridge Rule Created for tenant {tenant_id}')
 
         return rule['RuleArn']
 
     except Exception as e:
-        logger.error('Error occured while creating eventbridge rule', e)
+        logging.error('Error occured while creating eventbridge rule', e)
         raise Exception('Error occured while creating eventbridge rule', e) 
 
 def __create_trigger_lambda_eventbridge_permissions(rule_arn):
@@ -267,10 +266,10 @@ def __create_trigger_lambda_eventbridge_permissions(rule_arn):
             Principal='events.amazonaws.com',
             SourceArn=rule_arn
         )
-        logger.info(f'Trigger Lambda EventBridge permissions created')
+        logging.info(f'Trigger Lambda EventBridge permissions created')
 
     except Exception as e:
-        logger.error('Error occured while creating trigger lambda eventbridge permissions', e)
+        logging.error('Error occured while creating trigger lambda eventbridge permissions', e)
         raise Exception('Error occured while creating trigger lambda eventbridge permissions', e)
     
 def __create_eventbridge_tenant_rule_target(tenant_id, kb_id, rule_name, datasource_id):
@@ -304,10 +303,10 @@ def __create_eventbridge_tenant_rule_target(tenant_id, kb_id, rule_name, datasou
                 }
             ]
         )
-        logger.info(f'Eventbridge rule target created for tenant {tenant_id}')
+        logging.info(f'Eventbridge rule target created for tenant {tenant_id}')
 
     except Exception as e:
-        logger.error('Error occured while creating eventbridge rule', e)
+        logging.error('Error occured while creating eventbridge rule', e)
         raise Exception('Error occured while creating eventbridge rule') from e 
         
 def __create_opensearch_serverless_tenant_index(tenantId, kb_collection_endpoint):
@@ -360,15 +359,15 @@ def __create_opensearch_serverless_tenant_index(tenantId, kb_collection_endpoint
         # Create the index
         try:
             response = client.indices.create(index=tenantId, body=index_body)
-            logger.info(f'Tenant open search serverless index created: {response}')
+            logging.info(f'Tenant open search serverless index created: {response}')
         except Exception as e:
             if 'resource_already_exists_exception' in str(e).lower():
-                logger.info(f'Tenant open search serverless index {tenantId} already exists, skipping creation.')
+                logging.info(f'Tenant open search serverless index {tenantId} already exists, skipping creation.')
             else:
-                logger.error('Error occurred while creating opensearch serverless tenant index', e)
+                logging.error('Error occurred while creating opensearch serverless tenant index', e)
                 raise Exception('Error occurred while creating opensearch serverless tenant index') from e
     except Exception as e:
-        logger.error('Error occured while creating opensearch serverless tenant prefix', e)
+        logging.error('Error occured while creating opensearch serverless tenant prefix', e)
         raise Exception('Error occured while creating opensearch serverless tenant prefix') from e   
     
 

@@ -3,20 +3,14 @@
 # Enable nocasematch option
 shopt -s nocasematch
 
-# Clone the serverless reference solution repository
-# pip3 install git-remote-codecommit
-# export CDK_PARAM_CODE_COMMIT_REPOSITORY_NAME="saas-genai-workshop"
-# git clone codecommit://$CDK_PARAM_CODE_COMMIT_REPOSITORY_NAME
-
 S3_TENANT_SOURCECODE_BUCKET_URL=$(aws cloudformation describe-stacks --stack-name saas-genai-workshop-bootstrap-template --query "Stacks[0].Outputs[?OutputKey=='TenantSourceCodeS3Bucket'].OutputValue" --output text)
 export CDK_PARAM_CODE_REPOSITORY_NAME="saas-genai-workshop"
 
 # Download the folder from S3 to local directory
 echo "Downloading folder from s3://$S3_TENANT_SOURCECODE_BUCKET_URL to $CDK_PARAM_CODE_REPOSITORY_NAME..."
 aws s3 cp "s3://$S3_TENANT_SOURCECODE_BUCKET_URL" "$CDK_PARAM_CODE_REPOSITORY_NAME" --recursive \
---exclude "cdk.out/*" --exclude "node_modules/*" --exclude ".git/*"
+--exclude "cdk/cdk.out/*" --exclude "cdk/node_modules/*" --exclude ".git/*"
 cd $CDK_PARAM_CODE_REPOSITORY_NAME/cdk
-npm install
 
 # Parse tenant details from the input message from step function
 export CDK_PARAM_TENANT_ID=$(echo $tenantId | tr -d '"')
@@ -73,6 +67,7 @@ pip3 install -r lib/tenant-template/tenant-provisioning/requirements.txt
 
 provision_name="Tenant Provisioning"
 # TODO: Lab1 - Add tenant provisioning service
+
 
 export KNOWLEDGE_BASE_NAME=$CDK_PARAM_TENANT_ID
 
