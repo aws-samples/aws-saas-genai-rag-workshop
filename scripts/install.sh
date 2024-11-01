@@ -40,6 +40,6 @@ FOLDER_PATH="$(dirname "$SCRIPT_DIR")"       # Get the parent folder of the scri
 
 # Step 4: Upload the folder to the S3 bucket
 echo "Uploading folder $FOLDER_PATH to S3 $S3_TENANT_SOURCECODE_BUCKET_URL"
-aws s3 cp "$FOLDER_PATH" "s3://$S3_TENANT_SOURCECODE_BUCKET_URL" --recursive --exclude "cdk/cdk.out/*" --exclude "cdk/node_modules/*" --exclude ".git/*"
+aws s3 cp "$FOLDER_PATH" "s3://$S3_TENANT_SOURCECODE_BUCKET_URL" --recursive --exclude "cdk/cdk.out/*" --exclude "cdk/node_modules/*" --exclude ".git/*" --quiet
 
 echo "Installation completed successfully"
