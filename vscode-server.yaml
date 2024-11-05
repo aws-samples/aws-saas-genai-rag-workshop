@@ -55,10 +55,6 @@ Parameters:
     Description: Path to Git repository to clone to the VS Code instance
     Type: String
     Default: ''
-  RepoName:
-    Description: Name of the Git repository to clone to the VS Code instance
-    Type: String
-    Default: ''
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -80,7 +76,6 @@ Metadata:
           - DevServerPort
           - BranchZipS3Path
           - RepoUrl
-          - RepoName
     ParameterLabels:
       VSCodeUser:
         default: VSCode user name
@@ -104,8 +99,6 @@ Metadata:
         default: Branch file S3 path
       RepoUrl:
         default: Git repository URL
-      RepoName:
-        default: Name of the Git repository URL
 
 Mappings:
   AWSRegions2PrefixListID:
@@ -818,10 +811,12 @@ Resources:
                     mkdir -p ${HomeFolder} && chown -R ${VSCodeUser}:${VSCodeUser} ${HomeFolder}
                     cd ${HomeFolder}
                     git clone --single-branch ${RepoUrl}
-                    echo "Git cloned to ${HomeFolder}/${RepoName}"
-                    ls -la ${HomeFolder}/${RepoName}
+                    REPO_NAME=$(basename ${RepoUrl} .git)
+                    echo "Extracted repo name: $REPO_NAME"
+                    echo "Git cloned to ${HomeFolder}/$REPO_NAME"
+                    ls -la ${HomeFolder}/$REPO_NAME
                     export AWS_REGION=${AWS::Region}
-                    cd ${HomeFolder}/${RepoName}/scripts
+                    cd ${HomeFolder}/$REPO_NAME/scripts
                     ./install.sh admin@example.com 2>&1
                     echo 'SaaS Control Plane deployed and Application Plane'
                   fi
