@@ -600,7 +600,7 @@ case "$1" in
 
 "update-token-limit")
   if [ $# -ne 4 ]; then
-    echo "Error: update-tenant requires tenant id, input tokens, and output tokens"
+    echo "Error: update-tenant requires tenant name, input tokens, and output tokens"
     exit 1
   fi
   update_token_limit "$2" "$3" "$4"
