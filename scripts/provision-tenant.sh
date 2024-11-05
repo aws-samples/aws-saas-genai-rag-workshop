@@ -9,7 +9,7 @@ export CDK_PARAM_CODE_REPOSITORY_NAME="saas-genai-workshop"
 # Download the folder from S3 to local directory
 echo "Downloading folder from s3://$S3_TENANT_SOURCECODE_BUCKET_URL to $CDK_PARAM_CODE_REPOSITORY_NAME..."
 aws s3 cp "s3://$S3_TENANT_SOURCECODE_BUCKET_URL" "$CDK_PARAM_CODE_REPOSITORY_NAME" --recursive \
---exclude "cdk/cdk.out/*" --exclude "cdk/node_modules/*" --exclude ".git/*"
+--exclude "cdk/cdk.out/*" --exclude "cdk/node_modules/*" --exclude ".git/*" --quiet
 cd $CDK_PARAM_CODE_REPOSITORY_NAME/cdk
 
 # Parse tenant details from the input message from step function
@@ -26,8 +26,8 @@ API_GATEWAY_USAGE_PLAN_ID_OUTPUT_PARAM_NAME="ApiGatewayUsagePlan"
 S3_PARAM_NAME="SaaSGenAIWorkshopS3Bucket"
 INGESTION_LAMBDA_ARN_PARAM_NAME="SaaSGenAIWorkshopTriggerIngestionLambdaArn"
 OSSC_ARN_PARAM_NAME="SaaSGenAIWorkshopOSSCollectionArn"
-INPUT_TOKENS="20000"
-OUTPUT_TOKENS="1000"
+INPUT_TOKENS="10000"
+OUTPUT_TOKENS="500"
 
 
 # Read tenant details from the cloudformation
