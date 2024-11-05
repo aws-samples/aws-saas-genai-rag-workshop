@@ -51,6 +51,14 @@ Parameters:
     Description: S3 path holding the branches zip file to be checked into the git repo, with each folder being a branch. The content of each folder will added as under a branch, with the folder name being used as the branch name. To leave the empty, leave blank
     Type: String
     Default: ''
+  RepoUrl:
+    Description: Path to Git repository to clone to the VS Code instance
+    Type: String
+    Default: ''
+  RepoName:
+    Description: Name of the Git repository to clone to the VS Code instance
+    Type: String
+    Default: ''
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -71,6 +79,8 @@ Metadata:
           - DevServerBasePath
           - DevServerPort
           - BranchZipS3Path
+          - RepoUrl
+          - RepoName
     ParameterLabels:
       VSCodeUser:
         default: VSCode user name
@@ -92,6 +102,10 @@ Metadata:
         default: Asset file S3 path
       BranchZipS3Path:
         default: Branch file S3 path
+      RepoUrl:
+        default: Git repository URL
+      RepoName:
+        default: Name of the Git repository URL
 
 Mappings:
   AWSRegions2PrefixListID:
@@ -790,6 +804,26 @@ Resources:
                     echo "Assets downloaded. Checking configuration: ${HomeFolder}"
                     ls -la ${HomeFolder}
                     sudo -u ${VSCodeUser} git -C ${HomeFolder} branch
+                  fi
+          - action: aws:runShellScript
+            name: GitCloneAndInstall
+            inputs:
+              runCommand:
+                - '#!/bin/bash'
+                - !Sub |
+                  if [[ -z "${RepoUrl}" ]]
+                  then
+                    echo "No Repository"
+                  else
+                    mkdir -p ${HomeFolder} && chown -R ${VSCodeUser}:${VSCodeUser} ${HomeFolder}
+                    cd ${HomeFolder}
+                    git clone --single-branch ${RepoUrl}
+                    echo "Git cloned to ${HomeFolder}/${RepoName}"
+                    ls -la ${HomeFolder}/${RepoName}
+                    export AWS_REGION=${AWS::Region}
+                    cd ${HomeFolder}/${RepoName}/scripts
+                    ./install.sh admin@example.com 2>&1
+                    echo 'SaaS Control Plane deployed and Application Plane'
                   fi
           - action: aws:runShellScript
             name: InstallPythonRequirements
