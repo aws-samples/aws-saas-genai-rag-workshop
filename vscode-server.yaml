@@ -913,6 +913,7 @@ Resources:
                   - aoss:CreateAccessPolicy
                   - aoss:APIAccessAll
                   - aoss:BatchGetCollection
+                  - lambda:InvokeFunction
                 Resource: '*'
 
   VSCodeInstanceProfile:
