@@ -816,9 +816,10 @@ Resources:
                     echo "Git cloned to ${HomeFolder}/$REPO_NAME"
                     ls -la ${HomeFolder}/$REPO_NAME
                     export AWS_REGION=${AWS::Region}
-                    cd ${HomeFolder}/$REPO_NAME/scripts
-                    ./install.sh admin@example.com 2>&1
-                    echo 'SaaS Control Plane deployed and Application Plane'
+                    cd ${HomeFolder}/$REPO_NAME/cdk
+                    npm install 2>&1
+                    npx cdk bootstrap
+                    echo 'npm installed'
                   fi
           - action: aws:runShellScript
             name: InstallPythonRequirements
