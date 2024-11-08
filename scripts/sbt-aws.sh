@@ -491,6 +491,7 @@ invoke() {
       BODY=$(echo "$RESPONSE" | sed '$d')
       HTTP_STATUS_CODE=$(echo "$RESPONSE" | tail -n1)
       echo "Request $i - HTTP Status Code: $HTTP_STATUS_CODE, Output Text: $BODY" &
+      sleep 12
     done
     wait
     echo "All done"
