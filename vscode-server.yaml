@@ -54,7 +54,7 @@ Parameters:
   RepoUrl:
     Description: Path to Git repository to clone to the VS Code instance
     Type: String
-    Default: ''
+    Default: 'https://github.com/aws-samples/aws-saas-genai-rag-workshop'
 
 Metadata:
   AWS::CloudFormation::Interface:
