@@ -819,6 +819,7 @@ Resources:
                     cd ${HomeFolder}/$REPO_NAME/cdk
                     npm install 2>&1
                     npx cdk bootstrap
+                    npx cdk acknowledge 30444
                     echo 'npm installed'
                   fi
           - action: aws:runShellScript
