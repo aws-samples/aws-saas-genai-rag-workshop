@@ -24,6 +24,7 @@ Parameters:
     Description: VSCode Server EC2 AMI ID parameter path
     Default: 'ami-0d081196e3df05f4d'
     AllowedValues: [
+      'ami-0d081196e3df05f4d',
       '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64',
       '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64',
       '/aws/service/canonical/ubuntu/server/jammy/stable/current/arm64/hvm/ebs-gp2/ami-id',
