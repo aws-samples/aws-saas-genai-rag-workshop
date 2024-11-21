@@ -491,7 +491,7 @@ Resources:
               runCommand:
                 - '#!/bin/bash'
                 - !Sub export HOME=/home/${VSCodeUser}
-                - curl -fsSL https://code-server.dev/install.sh | bash -s -- 2>&1
+                - curl -fsSL https://code-server.dev/install.sh | bash -s -- --version v4.95.3 2>&1
                 - !Sub systemctl enable --now code-server@${VSCodeUser} 2>&1
                 - !Sub |
                   tee /etc/nginx/conf.d/code-server.conf <<EOF
