@@ -20,11 +20,10 @@ Parameters:
     AllowedPattern: '^(t[2-4]|c[4-8]|m[4-8])[g]?\.((nano|micro|small|medium|large|x?large|([1-9]\d*x|[2-9])xlarge)|(1[68]|24|32|48)xlarge)$'
     ConstraintDescription: Must be a valid t, c or m series EC2 instance type
   InstanceAmiId:
-    Type: String
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Description: VSCode Server EC2 AMI ID parameter path
-    Default: 'ami-0d081196e3df05f4d'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64'
     AllowedValues: [
-      'ami-0d081196e3df05f4d',
       '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64',
       '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64',
       '/aws/service/canonical/ubuntu/server/jammy/stable/current/arm64/hvm/ebs-gp2/ami-id',
@@ -491,7 +490,7 @@ Resources:
               runCommand:
                 - '#!/bin/bash'
                 - !Sub export HOME=/home/${VSCodeUser}
-                - curl -fsSL https://code-server.dev/install.sh | bash -s -- --version 4.95.3 2>&1
+                - curl -fsSL https://code-server.dev/install.sh | bash -s -- 2>&1
                 - !Sub systemctl enable --now code-server@${VSCodeUser} 2>&1
                 - !Sub |
                   tee /etc/nginx/conf.d/code-server.conf <<EOF
