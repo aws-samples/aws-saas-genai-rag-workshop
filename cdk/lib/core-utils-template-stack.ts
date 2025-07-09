@@ -7,11 +7,11 @@ import { PolicyDocument } from "aws-cdk-lib/aws-iam";
 import { Project } from "aws-cdk-lib/aws-codebuild";
 import {
   CoreApplicationPlane,
-  DetailType,
   EventManager,
   ControlPlane,
-  BashJobRunnerProps,
-  BashJobRunner,
+  ProvisioningScriptJob,
+  DeprovisioningScriptJob,
+  TenantLifecycleScriptJobProps
 } from "@cdklabs/sbt-aws";
 import * as fs from "fs";
 
@@ -29,7 +29,7 @@ export class CoreUitlsTemplateStack extends Stack {
   ) {
     super(scope, id, props);
 
-    const provisioningJobRunnerProps: BashJobRunnerProps = {
+    const provisioningScriptJobProps: TenantLifecycleScriptJobProps = {
       permissions: PolicyDocument.fromJson(
         JSON.parse(`
         {
@@ -75,31 +75,40 @@ export class CoreUitlsTemplateStack extends Stack {
   `)
       ),
       script: fs.readFileSync("../scripts/provision-tenant.sh", "utf8"),
-      environmentJSONVariablesFromIncomingEvent: [
+      environmentStringVariablesFromIncomingEvent: [
         "tenantId",
         "tenantName",
         "email",
-        "tenantStatus",
+        "tier",
       ],
-      environmentVariablesToOutgoingEvent: ["tenantStatus", "tenantConfig"],
-      scriptEnvironmentVariables: {},
-      outgoingEvent: DetailType.PROVISION_SUCCESS,
-      incomingEvent: DetailType.ONBOARDING_REQUEST,
-      eventManager: props.controlPlane.eventManager,
+      environmentJSONVariablesFromIncomingEvent: ['prices'],
+
+      // environmentVariablesToOutgoingEvent: ["tenantStatus", "tenantConfig"],
+      environmentVariablesToOutgoingEvent: {tenantData:[
+        'tenantS3Bucket',
+        'tenantConfig',
+        // 'tenantStatus',
+        'prices', // added so we don't lose it for targets beyond provisioning (ex. billing)
+        'tenantName', // added so we don't lose it for targets beyond provisioning (ex. billing)
+        'email', // added so we don't lose it for targets beyond provisioning (ex. billing)
+      ],
+      tenantRegistrationData: ['registrationStatus'],
+     },
+     eventManager: props.controlPlane.eventManager,
     };
 
-    const provisioningJobRunner: BashJobRunner = new BashJobRunner(
+    const provisioningScriptJob: ProvisioningScriptJob = new ProvisioningScriptJob(
       this,
-      "provisioningJobRunner",
-      provisioningJobRunnerProps
+      'provisioningScriptJob', 
+      provisioningScriptJobProps
     );
 
-    this.codeBuildProject = provisioningJobRunner.codebuildProject;
+    this.codeBuildProject = provisioningScriptJob.codebuildProject;
 
     // TODO: Lab1 - Add SBT core utils component
     new CoreApplicationPlane(this, "CoreApplicationPlane", {
       eventManager: props.controlPlane.eventManager,
-      jobRunnersList: [provisioningJobRunner],
+      scriptJobs: [provisioningScriptJob],
     });
   }
 }

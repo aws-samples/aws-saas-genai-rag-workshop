@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 set -e
 
@@ -9,33 +11,45 @@ CONFIG_FILE="${HOME}/.sbt-aws-config"
 help() {
   echo "Usage: $0 [--debug] <operation> [additional args]"
   echo "Operations:"
-  echo "  configure <control_plane_stack> <admin_user_name>"
+  echo "  configure <control_plane_stack> <user_email>"
   echo "  refresh-tokens"
-  echo "  create-tenant <tenant_name>"
+  echo "  create-tenant"
+  echo "  get-tenant-registration <tenant_registration_id>"
+  echo "  get-all-tenant-registrations <limit> <next_token>"
+  echo "  update-tenant-registration <tenant_registration_id> <key> <value>"
+  echo "  delete-tenant-registration <tenant_registration_id>"
   echo "  get-tenant <tenant_id>"
-  echo "  get-all-tenants"
-  echo "  get-knowledge-base-id <tenant_name>"
-  echo "  delete-tenant <tenant_id>"
-  echo "  update-tenant <tenant_id> <key> <value>"
+  echo "  get-all-tenants <limit> <next_token>"
   echo "  update-token-limit <tenant_name> <input_tokens> <output_tokens>"
   echo "  create-user"
-  echo "  get-user <user_name>"
-  echo "  delete-user <user_name>"
+  echo "  get-user <user_id>"
+  echo "  get-all-users <limit> <next_token>"
+  echo "  update-user <user_id> <user_role> <user_email>"
+  echo "  delete-user <user_id>"
   echo "  invoke <user_name> <password> <query> <requests>"
   echo "  upload-file <user_name> <password> <file_location>"
   echo "  execute-query <user_name> <password> <knowledge_base_query>"
   echo "  help"
 }
 
+
 generate_credentials() {
   if $DEBUG; then
     echo "Generating credentials..."
   fi
 
-  CLIENT_ID=$(aws cloudformation describe-stacks --stack-name $CONTROL_PLANE_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='ControlPlaneIdpClientId'].OutputValue"| jq -r '.[0]')
-  USER_POOL_ID=$(aws cloudformation describe-stacks --stack-name $CONTROL_PLANE_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='ControlPlaneIdpUserPoolId'].OutputValue"| jq -r '.[0]')
-  USER="$2"
+  USER="admin@example.com"
   PASSWORD="$1"
+  CONTROL_PLANE_STACK_NAME="$2"
+
+  CLIENT_ID=$(aws cloudformation describe-stacks \
+    --stack-name "$CONTROL_PLANE_STACK_NAME" \
+    --query "Stacks[0].Outputs[?contains(OutputKey,'ControlPlaneIdpClientId')].OutputValue" \
+    --output text)
+  USER_POOL_ID=$(aws cloudformation describe-stacks \
+    --stack-name "$CONTROL_PLANE_STACK_NAME" \
+    --query "Stacks[0].Outputs[?contains(OutputKey,'ControlPlaneIdpUserPoolId')].OutputValue" \
+    --output text)
 
   if $DEBUG; then
     echo "CLIENT_ID: $CLIENT_ID"
@@ -47,6 +61,8 @@ generate_credentials() {
   aws cognito-idp update-user-pool-client \
     --user-pool-id "$USER_POOL_ID" \
     --client-id "$CLIENT_ID" \
+    --id-token-validity 3 \
+    --access-token-validity 3 \
     --explicit-auth-flows USER_PASSWORD_AUTH \
     --output text >/dev/null
 
@@ -73,34 +89,33 @@ generate_credentials() {
     --auth-parameters "USERNAME='${USER}',PASSWORD='${PASSWORD}'" \
     --query 'AuthenticationResult')
 
-
   ACCESS_TOKEN=$(echo "$AUTHENTICATION_RESULT" | jq -r '.AccessToken')
-  ID_TOKEN=$(echo "$AUTHENTICATION_RESULT" | jq -r '.IdToken')
 
   if $DEBUG; then
     echo "ACCESS_TOKEN: $ACCESS_TOKEN"
-    echo "ID_TOKEN: $ID_TOKEN"
   fi
 
   export ACCESS_TOKEN
-  export ID_TOKEN
 }
-
 
 configure() {
   CONTROL_PLANE_STACK_NAME="$1"
-  ADMIN_USER_NAME="$2"
+  USER_EMAIL="$2"
+  # EMAIL_USERNAME="$(echo $USER_EMAIL | cut -d "@" -f 1)"
+  EMAIL_USERNAME="$2"
+  EMAIL_DOMAIN="$(echo $USER_EMAIL | cut -d "@" -f 2)"
 
   if $DEBUG; then
     echo "Configuring with:"
     echo "CONTROL_PLANE_STACK_NAME: $CONTROL_PLANE_STACK_NAME"
-    echo "ADMIN_USER_NAME: $ADMIN_USER_NAME"
+    echo "EMAIL_USERNAME: $EMAIL_USERNAME"
+    echo "EMAIL_DOMAIN: $EMAIL_DOMAIN"
   fi
 
   read -r -s -p "Enter admin password: " ADMIN_USER_PASSWORD
   echo
 
-  generate_credentials "$ADMIN_USER_PASSWORD" "$ADMIN_USER_NAME"
+  generate_credentials "$ADMIN_USER_PASSWORD" "$CONTROL_PLANE_STACK_NAME"
   CONTROL_PLANE_API_ENDPOINT=$(aws cloudformation describe-stacks \
     --stack-name "$CONTROL_PLANE_STACK_NAME" \
     --query "Stacks[0].Outputs[?contains(OutputKey,'controlPlaneAPIEndpoint')].OutputValue" \
@@ -110,8 +125,8 @@ configure() {
     echo "CONTROL_PLANE_API_ENDPOINT: $CONTROL_PLANE_API_ENDPOINT"
   fi
 
-  printf "CONTROL_PLANE_STACK_NAME=%s\nCONTROL_PLANE_API_ENDPOINT=%s\nADMIN_USER_PASSWORD=\'%s\'\nADMIN_USER_NAME=%s\nACCESS_TOKEN=%s\nID_TOKEN=%s\n" \
-    "$CONTROL_PLANE_STACK_NAME" "$CONTROL_PLANE_API_ENDPOINT" "$ADMIN_USER_PASSWORD" "$ADMIN_USER_NAME" "$ACCESS_TOKEN" "$ID_TOKEN" > "$CONFIG_FILE"
+  printf "CONTROL_PLANE_STACK_NAME=%s\nCONTROL_PLANE_API_ENDPOINT=%s\nADMIN_USER_PASSWORD=\'%s\'\nEMAIL_USERNAME=%s\nEMAIL_DOMAIN=%s\nACCESS_TOKEN=%s\n" \
+    "$CONTROL_PLANE_STACK_NAME" "$CONTROL_PLANE_API_ENDPOINT" "$ADMIN_USER_PASSWORD" "$EMAIL_USERNAME" "$EMAIL_DOMAIN" "$ACCESS_TOKEN" >"$CONFIG_FILE"
 
   if $DEBUG; then
     echo "Configuration saved to $CONFIG_FILE"
@@ -126,14 +141,14 @@ refresh_tokens() {
     echo "Refreshing tokens..."
   fi
 
-  generate_credentials "$ADMIN_USER_PASSWORD" "$ADMIN_USER_NAME"
+  generate_credentials "$ADMIN_USER_PASSWORD" "$CONTROL_PLANE_STACK_NAME"
   CONTROL_PLANE_API_ENDPOINT=$(aws cloudformation describe-stacks \
     --stack-name "$CONTROL_PLANE_STACK_NAME" \
     --query "Stacks[0].Outputs[?contains(OutputKey,'controlPlaneAPIEndpoint')].OutputValue" \
     --output text)
 
-  printf "CONTROL_PLANE_STACK_NAME=%s\nCONTROL_PLANE_API_ENDPOINT=%s\nADMIN_USER_PASSWORD=\'%s\'\nADMIN_USER_NAME=%s\nACCESS_TOKEN=%s\nID_TOKEN=%s\n" \
-    "$CONTROL_PLANE_STACK_NAME" "$CONTROL_PLANE_API_ENDPOINT" "$ADMIN_USER_PASSWORD" "$ADMIN_USER_NAME" "$ACCESS_TOKEN" "$ID_TOKEN"  >"$CONFIG_FILE"
+  printf "CONTROL_PLANE_STACK_NAME=%s\nCONTROL_PLANE_API_ENDPOINT=%s\nADMIN_USER_PASSWORD=\'%s\'\nEMAIL_USERNAME=%s\nEMAIL_DOMAIN=%s\nACCESS_TOKEN=%s\nACCESS_TOKEN=%s\n" \
+    "$CONTROL_PLANE_STACK_NAME" "$CONTROL_PLANE_API_ENDPOINT" "$ADMIN_USER_PASSWORD" "$EMAIL_USERNAME" "$EMAIL_DOMAIN" "$ACCESS_TOKEN" "$ACCESS_TOKEN" >"$CONFIG_FILE"
 
   if $DEBUG; then
     echo "Tokens refreshed and saved to $CONFIG_FILE"
@@ -159,15 +174,30 @@ create_tenant() {
     --arg tenantName "$TENANT_NAME" \
     --arg tenantEmail "$TENANT_EMAIL" \
     '{
-      "tenantName": $tenantName,
-      "email": $tenantEmail,
-      "tier": "basic",
-      "tenantStatus": "In progress"
+      "tenantData": {
+        "tenantName": $tenantName,
+        "email": $tenantEmail,
+        "tier": "basic",
+        "prices": [
+          {
+            "id": "price_123456789Example",
+            "metricName": "productsSold"
+          },
+          {
+            "id": "price_123456789AnotherExample",
+            "metricName": "plusProductsSold"
+          }
+        ]
+      },
+      "tenantRegistrationData": {
+        "registrationStatus": "In progress",
+        "tenantRegistrationData1": "test"
+      }
     }')
 
   RESPONSE=$(curl --request POST \
-    --url "${CONTROL_PLANE_API_ENDPOINT}tenants" \
-    --header "Authorization: Bearer ${ID_TOKEN}" \
+    --url "${CONTROL_PLANE_API_ENDPOINT}tenant-registrations" \
+    --header "Authorization: Bearer ${ACCESS_TOKEN}" \
     --header 'content-type: application/json' \
     --data "$DATA" \
     --silent)
@@ -179,6 +209,100 @@ create_tenant() {
   fi
 }
 
+get_tenant_registration() {
+  source_config
+  TENANT_REGISTRATION_ID="$1"
+
+  if $DEBUG; then
+    echo "Getting tenant registration with ID: $TENANT_REGISTRATION_ID"
+  fi
+
+  RESPONSE=$(curl --request GET \
+    --url "${CONTROL_PLANE_API_ENDPOINT}tenant-registrations/$TENANT_REGISTRATION_ID" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
+    --silent)
+
+  if $DEBUG; then
+    echo "Response: $RESPONSE"
+  else
+    echo "$RESPONSE"
+  fi
+}
+
+get_all_tenant_registrations() {
+  source_config
+  MY_LIMIT="${1:-10}"
+  NEXT_TOKEN="${2:-}"
+
+  if $DEBUG; then
+    echo "Getting all tenant registrations"
+  fi
+
+  RESPONSE=$(curl -G --request GET \
+    --url "${CONTROL_PLANE_API_ENDPOINT}tenant-registrations?limit=${MY_LIMIT}" \
+    --data-urlencode "next_token=${NEXT_TOKEN}" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
+    --silent)
+
+  if $DEBUG; then
+    echo "Response: $RESPONSE"
+  else
+    echo "$RESPONSE"
+  fi
+}
+
+
+update_tenant_registration() {
+  source_config
+  TENANT_REGISTRATION_ID="$1"
+  KEY="$2"
+  VALUE="$3"
+
+  DATA=$(jq --null-input \
+    --arg key "$KEY" \
+    --arg value "$VALUE" \
+    '{ "tenantRegistrationData": {($key): $value}, "tenantData": {($key): $value}}')
+
+  if $DEBUG; then
+    echo "Updating tenant registration with ID: $TENANT_REGISTRATION_ID with DATA: $DATA"
+  fi
+
+  RESPONSE=$(curl --request PATCH \
+    --url "${CONTROL_PLANE_API_ENDPOINT}tenant-registrations/$TENANT_REGISTRATION_ID" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
+    --header 'content-type: application/json' \
+    --data "$DATA" \
+    --silent)
+
+  if $DEBUG; then
+    echo "Response: $RESPONSE"
+  else
+    echo "$RESPONSE"
+  fi
+}
+
+delete_tenant_registration() {
+  source_config
+  TENANT_REGISTRATION_ID="$1"
+
+  if $DEBUG; then
+    echo "Deleting tenant registration with ID: $TENANT_REGISTRATION_ID"
+  fi
+
+  RESPONSE=$(curl --request DELETE \
+    --url "${CONTROL_PLANE_API_ENDPOINT}tenant-registrations/$TENANT_REGISTRATION_ID" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
+    --header 'content-type: application/json' \
+    --silent)
+
+  if $DEBUG; then
+    echo "Response: $RESPONSE"
+  else
+    echo "$RESPONSE"
+  fi
+}
+
+
 get_tenant() {
   source_config
   TENANT_ID="$1"
@@ -189,7 +313,7 @@ get_tenant() {
 
   RESPONSE=$(curl --request GET \
     --url "${CONTROL_PLANE_API_ENDPOINT}tenants/$TENANT_ID" \
-    --header "Authorization: Bearer $ID_TOKEN" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
     --silent)
 
   if $DEBUG; then
@@ -206,56 +330,14 @@ get_all_tenants() {
     echo "Getting all tenants"
   fi
 
-  RESPONSE=$(curl --request GET \
-    --url "${CONTROL_PLANE_API_ENDPOINT}tenants" \
-    --header "Authorization: Bearer $ID_TOKEN" \
-    --silent  | jq)
+  MY_LIMIT="${1:-10}"
+  NEXT_TOKEN="${2:-}"
 
-  if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
-  fi
-}
-
-get_knowledge_base_id() {
-  TENANT_NAME="$1"
-
-  if [ -z "$TENANT_NAME" ]; then
-    echo "Error: Tenant name not provided"
-    return 1
-  fi
-
-  if $DEBUG; then
-    echo "Getting Knowledge Base ID per tenant name"
-  fi
-
-  # Get all tenants
-  tenants=$(get_all_tenants)
-  # Extract the knowledgeBaseId for the given tenantName
-  KB_ID=$(echo "$tenants" | jq -r ".data[] | select(.tenantName==\"$TENANT_NAME\") | .tenantConfig | fromjson | .knowledgeBaseId")
-  
-  if [ -z "$KB_ID" ]; then
-    echo "Error: Tenant with name '$tenant_name' not found"
-    return 1
-  fi
-
-  echo "Knowledge Base id for $TENANT_NAME is: $KB_ID"
-}
-
-delete_tenant() {
-  source_config
-  TENANT_ID="$1"
-
-  if $DEBUG; then
-    echo "Deleting tenant with ID: $TENANT_ID"
-  fi
-
-  RESPONSE=$(curl --request DELETE \
-    --url "${CONTROL_PLANE_API_ENDPOINT}tenants/$TENANT_ID" \
-    --header "Authorization: Bearer $ID_TOKEN" \
-    --header 'content-type: application/json' \
-    --silent)
+  RESPONSE=$(curl -G --request GET \
+    --url "${CONTROL_PLANE_API_ENDPOINT}tenants?limit=${MY_LIMIT}" \
+    --data-urlencode "next_token=${NEXT_TOKEN}" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
+    --silent | jq)
 
   if $DEBUG; then
     echo "Response: $RESPONSE"
@@ -286,7 +368,7 @@ create_user() {
 
   RESPONSE=$(curl --request POST \
     --url "${CONTROL_PLANE_API_ENDPOINT}users" \
-    --header "Authorization: Bearer $ID_TOKEN" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
     --header 'content-type: application/json' \
     --data "$DATA" \
     --silent)
@@ -298,17 +380,71 @@ create_user() {
   fi
 }
 
-get_user() {
+get_all_users() {
   source_config
-  USER_NAME="$1"
+  MY_LIMIT="${1:-10}"
+  NEXT_TOKEN="${2:-}"
 
   if $DEBUG; then
-    echo "Getting user with name: $USER_NAME"
+    echo "Getting all users"
+  fi
+
+  RESPONSE=$(curl -G --request GET \
+    --url "${CONTROL_PLANE_API_ENDPOINT}users?limit=${MY_LIMIT}" \
+    --data-urlencode "next_token=${NEXT_TOKEN}" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
+    --silent)
+
+  if $DEBUG; then
+    echo "Response: $RESPONSE"
+  else
+    echo "$RESPONSE"
+  fi
+}
+
+get_user() {
+  source_config
+  USER_ID="$1"
+
+  if $DEBUG; then
+    echo "Getting user with id: $USER_ID"
   fi
 
   RESPONSE=$(curl --request GET \
-    --url "${CONTROL_PLANE_API_ENDPOINT}users/$USER_NAME" \
-    --header "Authorization: Bearer $ID_TOKEN" \
+    --url "${CONTROL_PLANE_API_ENDPOINT}users/$USER_ID" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
+    --silent)
+
+  if $DEBUG; then
+    echo "Response: $RESPONSE"
+  else
+    echo "$RESPONSE"
+  fi
+}
+
+update_user() {
+  source_config
+  USER_ID="$1"
+  USER_ROLE="${2:-}"
+  USER_EMAIL="${3:-}"
+
+  DATA=$(jq --null-input \
+    --arg userRole "$USER_ROLE" \
+    --arg email "$USER_EMAIL" \
+    '{
+      userRole: $userRole,
+      email: $email
+    }' | jq 'with_entries(select(.value != null))')
+
+  if $DEBUG; then
+    echo "Updating user with ID: $USER_ID with DATA: $DATA"
+  fi
+
+  RESPONSE=$(curl --request PUT \
+    --url "${CONTROL_PLANE_API_ENDPOINT}users/$USER_ID" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
+    --header 'content-type: application/json' \
+    --data "$DATA" \
     --silent)
 
   if $DEBUG; then
@@ -320,15 +456,15 @@ get_user() {
 
 delete_user() {
   source_config
-  USER_NAME="$1"
+  USER_ID="$1"
 
   if $DEBUG; then
-    echo "Deleting user with name: $USER_NAME"
+    echo "Deleting user with id: $USER_ID"
   fi
 
   RESPONSE=$(curl --request DELETE \
-    --url "${CONTROL_PLANE_API_ENDPOINT}users/$USER_NAME" \
-    --header "Authorization: Bearer $ID_TOKEN" \
+    --url "${CONTROL_PLANE_API_ENDPOINT}users/$USER_ID" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
     --silent)
 
   if $DEBUG; then
@@ -349,6 +485,8 @@ update_token_limit() {
 
   # Extract the tenantId for the matching tenantName
   TENANT_ID=$(echo "$tenants" | jq -r ".data[] | select(.tenantName==\"$TENANT_NAME\") | .tenantId")
+  TENANT_REGISTRATION_ID=$(echo "$tenants" | jq -r ".data[] | select(.tenantName==\"$TENANT_NAME\") | .tenantRegistrationId")
+
 
   if [ -z "$TENANT_ID" ] || [ "$TENANT_ID" = "null" ]; then
     echo "Error: Could not find tenant ID for tenant name: $TENANT_NAME" >&2
@@ -358,14 +496,16 @@ update_token_limit() {
   # Fetch the current tenantConfig
   CURRENT_CONFIG=$(curl --silent --request GET \
     --url "${CONTROL_PLANE_API_ENDPOINT}tenants/$TENANT_ID" \
-    --header "Authorization: Bearer $ID_TOKEN" | jq -r '.data.tenantConfig')
+    --header "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.data.tenantConfig')
 
+echo "config: $CURRENT_CONFIG"
   # Update only the tokens while preserving other fields
   UPDATED_CONFIG=$(echo $CURRENT_CONFIG | jq \
     --arg inputTokens "$INPUT_TOKENS" \
     --arg outputTokens "$OUTPUT_TOKENS" \
     '.inputTokens = $inputTokens | .outputTokens = $outputTokens')
 
+echo "update: $UPDATED_CONFIG"
   # Construct the full update payload
   DATA=$(jq --null-input \
     --arg tenantConfig "$UPDATED_CONFIG" \
@@ -377,9 +517,9 @@ update_token_limit() {
   fi
 
   # Send the PUT request
-  RESPONSE=$(curl --request PUT \
-    --url "${CONTROL_PLANE_API_ENDPOINT}tenants/$TENANT_ID" \
-    --header "Authorization: Bearer $ID_TOKEN" \
+  RESPONSE=$(curl --request PATCH \
+    --url "${CONTROL_PLANE_API_ENDPOINT}tenant-registrations/$TENANT_REGISTRATION_ID" \
+    --header "Authorization: Bearer $ACCESS_TOKEN" \
     --header 'content-type: application/json' \
     --data "$DATA" \
     --write-out '%{http_code}' \
@@ -391,26 +531,6 @@ update_token_limit() {
   else
     echo "Error updating tenant $TENANT_NAME: HTTP status code $RESPONSE" >&2
   fi
-}
-
-update_tenant() {
-  echo "PUT ${CONTROL_PLANE_API_ENDPOINT}tenants/$TENANT_ID only supports AWS_IAM auth"
-  # source_config
-  # TENANT_ID="$1"
-  # KEY="$2"
-  # VALUE="$3"
-
-  # DATA=$(jq --null-input \
-  #   --arg key "$KEY" \
-  #   --arg value "$VALUE" \
-  #   '{($key): $value}')
-
-  # curl --request PUT \
-  #   --url "${CONTROL_PLANE_API_ENDPOINT}tenants/$TENANT_ID" \
-  #   --header "Authorization: Bearer $ID_TOKEN" \
-  #   --header 'content-type: application/json' \
-  #   --data "$DATA" \
-  #   --silent
 }
 
 upload_file() {
@@ -532,6 +652,30 @@ execute_query() {
 
 }
 
+get_knowledge_base_id() {
+  TENANT_NAME="$1"
+
+  if [ -z "$TENANT_NAME" ]; then
+    echo "Error: Tenant name not provided"
+    return 1
+  fi
+
+  if $DEBUG; then
+    echo "Getting Knowledge Base ID per tenant name"
+  fi
+
+  # Get all tenants
+  tenants=$(get_all_tenants)
+  # Extract the knowledgeBaseId for the given tenantName
+  KB_ID=$(echo "$tenants" | jq -r ".data[] | select(.tenantName==\"$TENANT_NAME\") | .tenantConfig | fromjson | .knowledgeBaseId")
+  
+  if [ -z "$KB_ID" ]; then
+    echo "Error: Tenant with name '$tenant_name' not found"
+    return 1
+  fi
+
+  echo "Knowledge Base id for $TENANT_NAME is: $KB_ID"
+}
 
 # Main
 DEBUG=false
@@ -563,16 +707,44 @@ case "$1" in
   create_tenant "$2"
   ;;
 
+"get-tenant-registration")
+  if [ $# -ne 2 ]; then
+    echo "Error: get-tenant-registration requires tenant registration id"
+    exit 1
+  fi
+  get_tenant_registration "$2"
+  ;;
+
+"get-all-tenant-registrations")
+  get_all_tenant_registrations "$2" "$3"
+  ;;
+
+"update-tenant-registration")
+  if [ $# -ne 4 ]; then
+    echo "Error: update-tenant-registration requires tenant registration id, key, and value"
+    exit 1
+  fi
+  update_tenant_registration "$2" "$3" "$4"
+  ;;
+
+"delete-tenant-registration")
+  if [ $# -ne 2 ]; then
+    echo "Error: delete-tenant-registration requires tenant registration id"
+    exit 1
+  fi
+  delete_tenant_registration "$2"
+  ;;
+
 "get-tenant")
   if [ $# -ne 2 ]; then
-    echo "Error: delete-tenant requires tenant id"
+    echo "Error: get-tenant requires tenant id"
     exit 1
   fi
   get_tenant "$2"
   ;;
 
 "get-all-tenants")
-  get_all_tenants
+  get_all_tenants "$2" "$3"
   ;;
 
 "get-knowledge-base-id")
@@ -581,22 +753,6 @@ case "$1" in
     exit 1
   fi
   get_knowledge_base_id "$2"
-  ;;
-
-"delete-tenant")
-  if [ $# -ne 2 ]; then
-    echo "Error: delete-tenant requires tenant id"
-    exit 1
-  fi
-  delete_tenant "$2"
-  ;;
-
-"update-tenant")
-  if [ $# -ne 4 ]; then
-    echo "Error: update-tenant requires tenant id, key, and value"
-    exit 1
-  fi
-  update_tenant "$2" "$3" "$4"
   ;;
 
 "update-token-limit")
@@ -635,17 +791,29 @@ case "$1" in
   create_user
   ;;
 
+"get-all-users")
+  get_all_users "$2" "$3"
+  ;;
+
 "get-user")
   if [ $# -ne 2 ]; then
-    echo "Error: get-user requires user name"
+    echo "Error: get-user requires user id"
     exit 1
   fi
   get_user "$2"
   ;;
 
+"update-user")
+  if [ $# -ne 4 ]; then
+    echo "Error: update-user requires user id and new (or same) user role and user email"
+    exit 1
+  fi
+  update_user "$2" "$3" "$4"
+  ;;
+
 "delete-user")
   if [ $# -ne 2 ]; then
-    echo "Error: delete-user requires user name"
+    echo "Error: delete-user requires user id"
     exit 1
   fi
   delete_user "$2"
