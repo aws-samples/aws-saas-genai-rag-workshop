@@ -463,18 +463,11 @@ Resources:
             inputs:
               runCommand:
                 - '#!/bin/bash'
-                - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-                - export NVM_DIR="$HOME/.nvm"
-                - '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
-                - nvm install {{ nodeVersion }}
-                - nvm use {{ nodeVersion }}
+                - dnf install -y nodejs npm
                 - npm install -g npm@latest
-                - echo "Node.js and npm versions:"
-                - node -v 
+                - echo "Node and npm installed. Checking configuration"
+                - node -v
                 - npm -v
-                - echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc
-                - echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc
-                - echo "nvm use {{ nodeVersion }}" >> ~/.bashrc
           - action: aws:runShellScript
             name: InstallNodeApt
             precondition:
@@ -601,15 +594,15 @@ Resources:
                 - '#!/bin/bash'
                 - dnf install -y docker
                 - !Sub usermod -aG docker ${VSCodeUser}
-                - systemctl start docker.service
-                - systemctl enable docker.service
-                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-                - docker buildx create --name multiarch --driver docker-container --use
-                - docker buildx inspect --bootstrap
                 - !Sub systemctl restart code-server@${VSCodeUser}.service
-                - echo "Docker with multi-arch support installed"
+                - systemctl start docker.service
+                - echo "Docker installed. Checking configuration"
                 - docker --version
-                - docker buildx ls
+                - systemctl status docker.service
+                - echo "Setting up QEMU for multi-arch support"
+                - ls /proc/sys/fs/binfmt_misc/
+                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+                - echo "QEMU setup completed"
           - action: aws:runShellScript
             name: InstallDockerApt
             precondition:
@@ -622,16 +615,15 @@ Resources:
                 - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
                 - echo "deb [signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release --codename --short) stable" > /etc/apt/sources.list.d/docker.list
                 - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io
-                - !Sub usermod -aG docker ${VSCodeUser}
-                - systemctl start docker.service
-                - systemctl enable docker.service
-                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-                - docker buildx create --name multiarch --driver docker-container --use
-                - docker buildx inspect --bootstrap
                 - !Sub systemctl restart code-server@${VSCodeUser}.service
-                - echo "Docker with multi-arch support installed"
+                - systemctl start docker.service
+                - echo "Docker installed. Checking configuration"
                 - docker --version
-                - docker buildx ls
+                - systemctl status docker.service
+                - echo "Setting up QEMU for multi-arch support"
+                - ls /proc/sys/fs/binfmt_misc/
+                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+                - echo "QEMU setup completed"
           - action: aws:runShellScript
             name: InstallGitDnf
             precondition:
