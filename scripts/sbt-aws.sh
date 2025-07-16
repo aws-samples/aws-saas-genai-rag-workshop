@@ -165,9 +165,9 @@ create_tenant() {
   source_config
   
   if $DEBUG; then
-    echo "Creating tenant with:"
-    echo "TENANT_NAME: $TENANT_NAME"
-    echo "TENANT_EMAIL: $TENANT_EMAIL"
+    echo "Creating tenant with:" >&2
+    echo "TENANT_NAME: $TENANT_NAME" >&2
+    echo "TENANT_EMAIL: $TENANT_EMAIL" >&2
   fi
 
   DATA=$(jq --null-input \
@@ -203,10 +203,10 @@ create_tenant() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE"  >&2
   fi
+    
+  echo "$RESPONSE"
 }
 
 get_tenant_registration() {
@@ -214,7 +214,7 @@ get_tenant_registration() {
   TENANT_REGISTRATION_ID="$1"
 
   if $DEBUG; then
-    echo "Getting tenant registration with ID: $TENANT_REGISTRATION_ID"
+    echo "Getting tenant registration with ID: $TENANT_REGISTRATION_ID" >&2
   fi
 
   RESPONSE=$(curl --request GET \
@@ -223,10 +223,10 @@ get_tenant_registration() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE" >&2
   fi
+    
+  echo "$RESPONSE"
 }
 
 get_all_tenant_registrations() {
@@ -235,7 +235,7 @@ get_all_tenant_registrations() {
   NEXT_TOKEN="${2:-}"
 
   if $DEBUG; then
-    echo "Getting all tenant registrations"
+    echo "Getting all tenant registrations" >&2
   fi
 
   RESPONSE=$(curl -G --request GET \
@@ -245,10 +245,10 @@ get_all_tenant_registrations() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE" >&2
   fi
+    
+  echo "$RESPONSE"
 }
 
 
@@ -275,10 +275,10 @@ update_tenant_registration() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE" >&2
   fi
+  
+  echo "$RESPONSE"
 }
 
 delete_tenant_registration() {
@@ -286,7 +286,7 @@ delete_tenant_registration() {
   TENANT_REGISTRATION_ID="$1"
 
   if $DEBUG; then
-    echo "Deleting tenant registration with ID: $TENANT_REGISTRATION_ID"
+    echo "Deleting tenant registration with ID: $TENANT_REGISTRATION_ID" >&2
   fi
 
   RESPONSE=$(curl --request DELETE \
@@ -296,10 +296,10 @@ delete_tenant_registration() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE" >&2
   fi
+  
+  echo "$RESPONSE"
 }
 
 
@@ -308,7 +308,7 @@ get_tenant() {
   TENANT_ID="$1"
 
   if $DEBUG; then
-    echo "Getting tenant with ID: $TENANT_ID"
+    echo "Getting tenant with ID: $TENANT_ID" >&2
   fi
 
   RESPONSE=$(curl --request GET \
@@ -317,17 +317,17 @@ get_tenant() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE" >&2
   fi
+  
+  echo "$RESPONSE"
 }
 
 get_all_tenants() {
   source_config
 
   if $DEBUG; then
-    echo "Getting all tenants"
+    echo "Getting all tenants" >&2
   fi
 
   MY_LIMIT="${1:-10}"
@@ -340,10 +340,10 @@ get_all_tenants() {
     --silent | jq)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE" >&2
   fi
+    
+  echo "$RESPONSE"
 }
 
 create_user() {
@@ -352,9 +352,9 @@ create_user() {
   USER_EMAIL="${EMAIL_USERNAME}+${USER_NAME}@${EMAIL_DOMAIN}"
 
   if $DEBUG; then
-    echo "Creating user with:"
-    echo "USER_NAME: $USER_NAME"
-    echo "USER_EMAIL: $USER_EMAIL"
+    echo "Creating user with:" >&2
+    echo "USER_NAME: $USER_NAME" >&2
+    echo "USER_EMAIL: $USER_EMAIL"  >&2
   fi
 
   DATA=$(jq --null-input \
@@ -374,10 +374,10 @@ create_user() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE" >&2
   fi
+  
+  echo "$RESPONSE"
 }
 
 get_all_users() {
@@ -386,7 +386,7 @@ get_all_users() {
   NEXT_TOKEN="${2:-}"
 
   if $DEBUG; then
-    echo "Getting all users"
+    echo "Getting all users" >&2
   fi
 
   RESPONSE=$(curl -G --request GET \
@@ -396,10 +396,10 @@ get_all_users() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE" >&2
   fi
+
+  echo "$RESPONSE"
 }
 
 get_user() {
@@ -407,7 +407,7 @@ get_user() {
   USER_ID="$1"
 
   if $DEBUG; then
-    echo "Getting user with id: $USER_ID"
+    echo "Getting user with id: $USER_ID" >&2
   fi
 
   RESPONSE=$(curl --request GET \
@@ -416,10 +416,10 @@ get_user() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE" >&2
   fi
+    
+  echo "$RESPONSE"
 }
 
 update_user() {
@@ -448,10 +448,10 @@ update_user() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE" >&2
   fi
+  
+  echo "$RESPONSE"
 }
 
 delete_user() {
@@ -459,7 +459,7 @@ delete_user() {
   USER_ID="$1"
 
   if $DEBUG; then
-    echo "Deleting user with id: $USER_ID"
+    echo "Deleting user with id: $USER_ID" >&2
   fi
 
   RESPONSE=$(curl --request DELETE \
@@ -468,10 +468,10 @@ delete_user() {
     --silent)
 
   if $DEBUG; then
-    echo "Response: $RESPONSE"
-  else
-    echo "$RESPONSE"
+    echo "Response: $RESPONSE"  >&2
   fi
+  
+  echo "$RESPONSE"
 }
 
 update_token_limit() {
@@ -509,14 +509,14 @@ echo "update: $UPDATED_CONFIG"
   # Construct the full update payload
   DATA=$(jq --null-input \
     --arg tenantConfig "$UPDATED_CONFIG" \
-    '{"tenantConfig": $tenantConfig}')
+    '{"tenantData": {"tenantConfig": $tenantConfig}}')
 
   if $DEBUG; then
     echo "CURRENT CONFIG: $CURRENT_CONFIG"
     echo "UPDATED CONFIG: $UPDATED_CONFIG"
   fi
 
-  # Send the PUT request
+  # Send the PATCH request
   RESPONSE=$(curl --request PATCH \
     --url "${CONTROL_PLANE_API_ENDPOINT}tenant-registrations/$TENANT_REGISTRATION_ID" \
     --header "Authorization: Bearer $ACCESS_TOKEN" \
@@ -527,7 +527,7 @@ echo "update: $UPDATED_CONFIG"
     --output /dev/null)
 
   if [ "$RESPONSE" -eq 200 ]; then
-    echo "Tenant $TENANT_NAME updated to $INPUT_TOKENS input tokens and $OUTPUT_TOKENS output tokens"
+    echo "Tenant $TENANT_NAME updated to $INPUT_TOKENS input tokens and $OUTPUT_TOKENS output tokens" >&2
   else
     echo "Error updating tenant $TENANT_NAME: HTTP status code $RESPONSE" >&2
   fi
