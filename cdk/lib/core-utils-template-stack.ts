@@ -83,17 +83,17 @@ export class CoreUitlsTemplateStack extends Stack {
       ],
       environmentJSONVariablesFromIncomingEvent: ['prices'],
 
-      // environmentVariablesToOutgoingEvent: ["tenantStatus", "tenantConfig"],
-      environmentVariablesToOutgoingEvent: {tenantData:[
-        'tenantS3Bucket',
-        'tenantConfig',
-        // 'tenantStatus',
-        'prices', // added so we don't lose it for targets beyond provisioning (ex. billing)
-        'tenantName', // added so we don't lose it for targets beyond provisioning (ex. billing)
-        'email', // added so we don't lose it for targets beyond provisioning (ex. billing)
-      ],
-      tenantRegistrationData: ['registrationStatus'],
+      environmentVariablesToOutgoingEvent: {
+        tenantData:[
+          'tenantS3Bucket',
+          'tenantConfig',
+          'prices', // added so we don't lose it for targets beyond provisioning (ex. billing)
+          'tenantName', // added so we don't lose it for targets beyond provisioning (ex. billing)
+          'email', // added so we don't lose it for targets beyond provisioning (ex. billing)
+        ],
+        tenantRegistrationData: ['registrationStatus'],
      },
+     scriptEnvironmentVariables: {},
      eventManager: props.controlPlane.eventManager,
     };
 
