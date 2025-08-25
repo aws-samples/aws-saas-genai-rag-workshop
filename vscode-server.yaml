@@ -600,9 +600,8 @@ Resources:
                 - docker --version
                 - systemctl status docker.service
                 - echo "Setting up QEMU for multi-arch support"
-                - ls /proc/sys/fs/binfmt_misc/
-                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-                - echo "QEMU setup completed"
+                - sudo mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+                - docker run --privileged --rm tonistiigi/binfmt --install arm6
           - action: aws:runShellScript
             name: InstallDockerApt
             precondition:
@@ -621,9 +620,8 @@ Resources:
                 - docker --version
                 - systemctl status docker.service
                 - echo "Setting up QEMU for multi-arch support"
-                - ls /proc/sys/fs/binfmt_misc/
-                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-                - echo "QEMU setup completed"
+                - sudo mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+                - docker run --privileged --rm tonistiigi/binfmt --install arm64
           - action: aws:runShellScript
             name: InstallGitDnf
             precondition:
@@ -818,7 +816,7 @@ Resources:
                   else
                     mkdir -p ${HomeFolder} && chown -R ${VSCodeUser}:${VSCodeUser} ${HomeFolder}
                     cd ${HomeFolder}
-                    git clone --single-branch --branch sbt-v0.9.1 ${RepoUrl}
+                    git clone --single-branch ${RepoUrl}
                     REPO_NAME=$(basename ${RepoUrl} .git)
                     echo "Extracted repo name: $REPO_NAME"
                     echo "Git cloned to ${HomeFolder}/$REPO_NAME"
