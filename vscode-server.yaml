@@ -816,7 +816,7 @@ Resources:
                   else
                     mkdir -p ${HomeFolder} && chown -R ${VSCodeUser}:${VSCodeUser} ${HomeFolder}
                     cd ${HomeFolder}
-                    git clone --single-branch --branch sbt-v0.9.1 ${RepoUrl}
+                    git clone --single-branch ${RepoUrl}
                     REPO_NAME=$(basename ${RepoUrl} .git)
                     echo "Extracted repo name: $REPO_NAME"
                     echo "Git cloned to ${HomeFolder}/$REPO_NAME"
