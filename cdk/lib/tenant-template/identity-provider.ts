@@ -4,7 +4,6 @@
 import { aws_cognito, StackProps, Duration } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { IdentityDetails } from "../interfaces/identity-details";
-import { KnowledgeBase } from "@cdklabs/generative-ai-cdk-constructs/lib/cdk-lib/bedrock";
 
 export class IdentityProvider extends Construct {
   public readonly tenantUserPool: aws_cognito.UserPool;

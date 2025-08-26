@@ -599,6 +599,9 @@ Resources:
                 - echo "Docker installed. Checking configuration"
                 - docker --version
                 - systemctl status docker.service
+                - echo "Setting up QEMU for multi-arch support"
+                - sudo mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
           - action: aws:runShellScript
             name: InstallDockerApt
             precondition:
@@ -616,6 +619,9 @@ Resources:
                 - echo "Docker installed. Checking configuration"
                 - docker --version
                 - systemctl status docker.service
+                - echo "Setting up QEMU for multi-arch support"
+                - sudo mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+                - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
           - action: aws:runShellScript
             name: InstallGitDnf
             precondition:
