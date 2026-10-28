@@ -21,10 +21,14 @@ logger = Logger()
 cors_config = CORSConfig(allow_origin="*", max_age=300)
 app = APIGatewayRestResolver(cors=cors_config)
 
-@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True)
+# log_event is off: the authorizer puts the caller's temporary AWS credentials in
+# event['requestContext']['authorizer'], so logging the event would write live
+# credentials to CloudWatch on every request.
+@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
-    logger.debug(event)
+    # Not logging the event: requestContext.authorizer carries the caller's
+    # temporary AWS credentials, read a few lines below.
   
     # Retrieve tenantId from event
     tenantId = event['requestContext']['authorizer']['principalId']

@@ -31,9 +31,26 @@ export class IdentityProvider extends Construct {
       },
     });
 
-    const writeAttributes = new aws_cognito.ClientAttributes()
-      .withStandardAttributes({ email: true })
-      .withCustomAttributes("tenantId", "userRole");
+    // Only email is writable by the signed-in user themselves.
+    //
+    // Any attribute listed here can be changed by a user with nothing but their
+    // own access token, via Cognito's UpdateUserAttributes API, without going
+    // anywhere near our API Gateway or Lambda functions. custom:tenantId is
+    // exactly what tenant_authorizer.py reads to decide which tenant's data the
+    // caller may reach, and it becomes the DynamoDB partition key the agent
+    // action group uses, so listing it here would let any tenant user grant
+    // themselves another tenant's identity. custom:userRole carries the same
+    // kind of authorization meaning. Both are set only through the admin side
+    // AdminCreateUser / AdminUpdateUserAttributes calls in
+    // user-management/user_management_service.py, which runs with provisioning
+    // credentials.
+    //
+    // The pool schema keeps these attributes mutable, which is deliberate:
+    // mutable governs whether an attribute can be changed at all after the user
+    // is created, so the admin-authorized re-provisioning path needs it.
+    const writeAttributes = new aws_cognito.ClientAttributes().withStandardAttributes(
+      { email: true }
+    );
 
     this.tenantUserPoolClient = new aws_cognito.UserPoolClient(
       this,

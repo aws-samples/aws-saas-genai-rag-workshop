@@ -32,6 +32,11 @@ import * as apigw from "aws-cdk-lib/aws-apigateway";
 import { Asset } from "aws-cdk-lib/aws-s3-assets";
 import { TableV2 } from "aws-cdk-lib/aws-dynamodb";
 
+// Parameter Store prefix holding per-tenant secrets such as the API key.
+// Must match TENANT_PARAMETER_PREFIX in scripts/provision-tenant.sh, which
+// writes these parameters during tenant provisioning.
+export const TENANT_PARAMETER_PREFIX = "/saas-genai-workshop/tenant";
+
 export interface ServicesProps {
   readonly appClientID: string;
   readonly userPoolID: string;
@@ -85,6 +90,28 @@ export class Services extends Construct {
         actions: ["cognito-idp:InitiateAuth"],
         resources: [
           `arn:aws:cognito-idp:${region}:${accountId}:userpool/${props.userPoolID}`,
+        ],
+      })
+    );
+
+    // Read per-tenant API keys from Parameter Store. These are deliberately not
+    // published in the tenant config, because /tenant-config is unauthenticated.
+    //
+    // Scoped to the api-key leaf rather than the whole tenant path. A wildcard
+    // in an SSM resource ARN spans '/' separators, so granting the whole path
+    // would also expose the generated user passwords stored under
+    // <prefix>/<tenantId>/users/..., which this function has no reason to read.
+    //
+    // No kms grant is needed alongside this: these parameters use the AWS
+    // managed aws/ssm key, whose own key policy allows principals in the
+    // account to use it when the call goes through SSM. Moving them to a
+    // customer managed key would require adding kms:Decrypt here.
+    authorizerLambdaExecRole.addToPolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ["ssm:GetParameter"],
+        resources: [
+          `arn:aws:ssm:${region}:${accountId}:parameter${TENANT_PARAMETER_PREFIX}/*/api-key`,
         ],
       })
     );
@@ -224,6 +251,7 @@ export class Services extends Construct {
           TENANT_TOKEN_USAGE_DYNAMODB_TABLE:
             props.tenantTokenUsageTable.tableName,
           TENANT_TOKEN_USAGE_ROLE_ARN: tenantTokenUsageTableAccessRole.roleArn,
+          TENANT_PARAMETER_PREFIX: TENANT_PARAMETER_PREFIX,
         },
       }
     );

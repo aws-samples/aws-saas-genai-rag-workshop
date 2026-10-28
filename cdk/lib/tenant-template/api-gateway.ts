@@ -39,7 +39,11 @@ export class ApiGateway extends Construct {
         accessLogDestination: new LogGroupLogDestination(apiLogGroup),
         methodOptions: {
           "/*/*": {
-            dataTraceEnabled: true,
+            // Data tracing logs full request and response data. It is a
+            // debugging aid rather than something to leave on: the authorizer
+            // context flowing through this API carries temporary AWS
+            // credentials. Error-level execution logging is kept.
+            dataTraceEnabled: false,
             loggingLevel: MethodLoggingLevel.ERROR,
           },
         },

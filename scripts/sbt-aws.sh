@@ -7,6 +7,16 @@ set -e
 # Config values
 CONFIG_FILE="${HOME}/.sbt-aws-config"
 
+# The control plane admin's Cognito username is its email address. This must
+# match CDK_PARAM_SYSTEM_ADMIN_EMAIL, or the default in control-plane-stack.ts
+# if that is unset.
+ADMIN_USER="${CDK_PARAM_SYSTEM_ADMIN_EMAIL:-admin@example.com}"
+
+# Where the control plane custom resource stores that account's generated
+# password. Must match CONTROL_PLANE_PARAMETER_PREFIX in
+# cdk/lib/cp-custom-cognito-auth/auth-custom-resource/index.py.
+CONTROL_PLANE_PARAMETER_PREFIX="/saas-genai-workshop/control-plane"
+
 # Functions
 help() {
   echo "Usage: $0 [--debug] <operation> [additional args]"
@@ -33,12 +43,26 @@ help() {
 }
 
 
+__read_admin_password() {
+  # Parameter Store names allow only a-zA-Z0-9_.-/ so the email is folded the
+  # same way __password_parameter_name() folds it in
+  # cdk/lib/cp-custom-cognito-auth/auth-custom-resource/index.py. Keep the two
+  # in step or the lookup silently misses.
+  local safe_user
+  safe_user=$(printf '%s' "$ADMIN_USER" | sed 's/[^a-zA-Z0-9_.-]/_/g')
+  aws ssm get-parameter \
+    --name "${CONTROL_PLANE_PARAMETER_PREFIX}/${safe_user}/password" \
+    --with-decryption \
+    --query 'Parameter.Value' \
+    --output text
+}
+
 generate_credentials() {
   if $DEBUG; then
     echo "Generating credentials..."
   fi
 
-  USER="admin@example.com"
+  USER="$ADMIN_USER"
   PASSWORD="$1"
   CONTROL_PLANE_STACK_NAME="$2"
 
@@ -46,41 +70,32 @@ generate_credentials() {
     --stack-name "$CONTROL_PLANE_STACK_NAME" \
     --query "Stacks[0].Outputs[?contains(OutputKey,'ControlPlaneIdpClientId')].OutputValue" \
     --output text)
-  USER_POOL_ID=$(aws cloudformation describe-stacks \
-    --stack-name "$CONTROL_PLANE_STACK_NAME" \
-    --query "Stacks[0].Outputs[?contains(OutputKey,'ControlPlaneIdpUserPoolId')].OutputValue" \
-    --output text)
 
   if $DEBUG; then
     echo "CLIENT_ID: $CLIENT_ID"
-    echo "USER_POOL_ID: $USER_POOL_ID"
     echo "USER: $USER"
   fi
 
-  # required in order to initiate-auth
-  aws cognito-idp update-user-pool-client \
-    --user-pool-id "$USER_POOL_ID" \
-    --client-id "$CLIENT_ID" \
-    --id-token-validity 3 \
-    --access-token-validity 3 \
-    --explicit-auth-flows USER_PASSWORD_AUTH \
-    --output text >/dev/null
-
-  if $DEBUG; then
-    echo "Updated user pool client for USER_PASSWORD_AUTH"
-  fi
-
-  # remove need for password reset
-  aws cognito-idp admin-set-user-password \
-    --user-pool-id "$USER_POOL_ID" \
-    --username "$USER" \
-    --password "$PASSWORD" \
-    --permanent \
-    --output text >/dev/null
-
-  if $DEBUG; then
-    echo "Set user password for $USER"
-  fi
+  # This function used to do two more things here. Both are removed deliberately.
+  #
+  # It called update-user-pool-client to enable USER_PASSWORD_AUTH and set the
+  # token validity. Neither is needed any more: the CDK app client already has
+  # ALLOW_USER_PASSWORD_AUTH, and token validity now lives on the construct in
+  # cdk/lib/cp-custom-cognito-auth/custom-cognito-auth.ts. That call was also
+  # actively harmful, because UpdateUserPoolClient is a full replace rather than
+  # a patch, so it reset every client property CDK configures -- including the
+  # narrowed writeAttributes -- on every single run.
+  #
+  # It also called admin-set-user-password --permanent with whatever the
+  # operator typed at the prompt. That is wrong in two ways now that the control
+  # plane custom resource generates and stores a password of its own: the
+  # account would diverge from the SecureString README.md tells operators to
+  # retrieve, and an operator following the published workshop guide types the
+  # old hardcoded password at that prompt, which this call would then make
+  # permanent -- reintroducing the exact credential this change removes.
+  #
+  # The password is now only ever read, never written. configure() takes it from
+  # Parameter Store when the prompt is left blank.
 
   # get credentials for user
   AUTHENTICATION_RESULT=$(aws cognito-idp initiate-auth \
@@ -112,8 +127,24 @@ configure() {
     echo "EMAIL_DOMAIN: $EMAIL_DOMAIN"
   fi
 
-  read -r -s -p "Enter admin password: " ADMIN_USER_PASSWORD
+  # Leave this blank to use the password the control plane generated at deploy
+  # time, which is the normal case. This script no longer sets the password, so
+  # typing one here that does not match the stored value just fails to
+  # authenticate rather than silently resetting the account.
+  read -r -s -p "Enter admin password (blank to read it from Parameter Store): " ADMIN_USER_PASSWORD
   echo
+  if [ -z "$ADMIN_USER_PASSWORD" ]; then
+    ADMIN_USER_PASSWORD=$(__read_admin_password)
+    if [ -z "$ADMIN_USER_PASSWORD" ] || [ "$ADMIN_USER_PASSWORD" = "None" ]; then
+      echo "Could not read the admin password for ${ADMIN_USER} from Parameter Store." >&2
+      echo "Check CDK_PARAM_SYSTEM_ADMIN_EMAIL, or list what is stored with:" >&2
+      echo "  aws ssm get-parameters-by-path --path ${CONTROL_PLANE_PARAMETER_PREFIX} --recursive --query 'Parameters[].Name' --output text" >&2
+      return 1
+    fi
+    if $DEBUG; then
+      echo "Read admin password from Parameter Store"
+    fi
+  fi
 
   generate_credentials "$ADMIN_USER_PASSWORD" "$CONTROL_PLANE_STACK_NAME"
   CONTROL_PLANE_API_ENDPOINT=$(aws cloudformation describe-stacks \

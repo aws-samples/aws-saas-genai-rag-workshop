@@ -28,6 +28,9 @@ INGESTION_LAMBDA_ARN_PARAM_NAME="SaaSGenAIWorkshopTriggerIngestionLambdaArn"
 OSSC_ARN_PARAM_NAME="SaaSGenAIWorkshopOSSCollectionArn"
 INPUT_TOKENS="10000"
 OUTPUT_TOKENS="500"
+# Parameter Store prefix for per-tenant secrets. Must match TENANT_PARAMETER_PREFIX
+# on the authorizer Lambda and the IAM policies that scope access to this path.
+export TENANT_PARAMETER_PREFIX="/saas-genai-workshop/tenant"
 
 
 # Read tenant details from the cloudformation
@@ -80,14 +83,44 @@ provision_name="Tenant Admin User Provisioning"
 tenant_admin_output=$(python3 lib/tenant-template/user-management/user_management_service.py --tenant-id $CDK_PARAM_TENANT_ID --email $TENANT_ADMIN_EMAIL --user-role "TenantAdmin" 2>&1 >/dev/null && exit_code=$?) || exit_code=$?
 check_error "$provision_name" $exit_code  "$tenant_admin_output" 
 
+# Store the tenant API key in Parameter Store.
+#
+# The tenant config below is served by the control plane's /tenant-config
+# endpoint, which is unauthenticated by design (it exists so a tenant's
+# frontend can bootstrap itself before anyone has signed in). Only values that
+# are safe to hand to an anonymous caller belong in it, so the API key is kept
+# out of it and held here instead. The authorizer Lambda reads this parameter
+# with its own IAM role.
+# Checked explicitly rather than leaning on `set -e`. The authorizer reads this
+# parameter on every request, so a tenant whose key never got stored is
+# provisioned but completely unusable -- and the failure would otherwise be an
+# unlabelled aws-cli error in the middle of a provisioning log. Name the step so
+# it is obvious which one broke.
+provision_name="Tenant API Key Storage"
+if [[ -z "$TENANT_API_KEY" ]]; then
+  echo "ERROR: $provision_name failed. TENANT_API_KEY is empty. Exiting"
+  exit 1
+fi
+if ! ssm_output=$(aws ssm put-parameter \
+  --name "$TENANT_PARAMETER_PREFIX/$CDK_PARAM_TENANT_ID/api-key" \
+  --value "$TENANT_API_KEY" \
+  --type SecureString \
+  --overwrite \
+  --no-cli-pager 2>&1 >/dev/null); then
+  echo "$ssm_output"
+  echo "ERROR: $provision_name failed. Exiting"
+  exit 1
+fi
+echo "$provision_name completed successfully"
+echo "Stored tenant API key at $TENANT_PARAMETER_PREFIX/$CDK_PARAM_TENANT_ID/api-key"
+
 # Create JSON response of output parameters
 export tenantConfig=$(jq --arg SAAS_APP_USERPOOL_ID "$SAAS_APP_USERPOOL_ID" \
   --arg SAAS_APP_CLIENT_ID "$SAAS_APP_CLIENT_ID" \
   --arg API_GATEWAY_URL "$API_GATEWAY_URL" \
-  --arg TENANT_API_KEY "$TENANT_API_KEY" \
   --arg CDK_PARAM_TENANT_NAME "$CDK_PARAM_TENANT_NAME" \
   --arg KNOWLEDGE_BASE_ID "$KNOWLEDGE_BASE_ID" \
   --arg INPUT_TOKENS "$INPUT_TOKENS" \
   --arg OUTPUT_TOKENS "$OUTPUT_TOKENS" \
-  -n '{"tenantName":$CDK_PARAM_TENANT_NAME,"userPoolId":$SAAS_APP_USERPOOL_ID,"appClientId":$SAAS_APP_CLIENT_ID,"apiGatewayUrl":$API_GATEWAY_URL,"apiKey":$TENANT_API_KEY, "knowledgeBaseId":$KNOWLEDGE_BASE_ID, "inputTokens":$INPUT_TOKENS, "outputTokens":$OUTPUT_TOKENS}')
+  -n '{"tenantName":$CDK_PARAM_TENANT_NAME,"userPoolId":$SAAS_APP_USERPOOL_ID,"appClientId":$SAAS_APP_CLIENT_ID,"apiGatewayUrl":$API_GATEWAY_URL, "knowledgeBaseId":$KNOWLEDGE_BASE_ID, "inputTokens":$INPUT_TOKENS, "outputTokens":$OUTPUT_TOKENS}')
 export tenantStatus="Complete"
