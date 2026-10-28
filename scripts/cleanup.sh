@@ -60,6 +60,25 @@ for table in $tables; do
     aws dynamodb delete-table --table-name $table --no-cli-pager
 done
 
+# Clean up the secrets held in Parameter Store
+#
+# Provisioning writes per-tenant API keys and generated user passwords as
+# SecureString parameters. They are not owned by any CloudFormation stack, so
+# destroying the stacks leaves them behind: without this step a torn-down
+# workshop still has live credentials sitting in the account.
+echo "$(date) cleaning up Parameter Store secrets..."
+for parameter_prefix in "/saas-genai-workshop/tenant" "/saas-genai-workshop/control-plane"; do
+    parameters=$(aws ssm get-parameters-by-path \
+        --path "$parameter_prefix" \
+        --recursive \
+        --query 'Parameters[].Name' \
+        --output text 2>/dev/null || true)
+    for parameter in $parameters; do
+        echo "Deleting parameter: $parameter"
+        aws ssm delete-parameter --name "$parameter" --no-cli-pager >/dev/null 2>&1 || true
+    done
+done
+
 # Clean up any Lambda functions
 # echo "Cleaning up Lambda functions..."
 # functions=$(aws lambda list-functions --query 'Functions[?contains(FunctionName, `YourProjectPrefix`)].FunctionName' --output text)

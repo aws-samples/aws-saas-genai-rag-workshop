@@ -69,7 +69,9 @@ def validateJWT(token, app_client_id, keys):
             logger.info('Token was not issued for this audience')
             return False
         
-        logger.info(claims)
+        # Not logging the claims: they carry the user's email and other
+        # personal data. The tenant the caller resolved to is logged instead.
+        logger.info(f"Token validated for tenant {claims.get('custom:tenantId')}")
         return claims
     except Exception as e:
         logger.error(f"Error validating JWT: {e}")

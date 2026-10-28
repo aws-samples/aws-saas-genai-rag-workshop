@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 
 import urllib.request
+import urllib.error
 import json
 import os
 import boto3
@@ -25,61 +26,116 @@ control_plane_gw_url = os.environ['CP_API_GW_URL']
 tenant_token_usage_role_arn = os.environ["TENANT_TOKEN_USAGE_ROLE_ARN"]
 tenant_token_usage_table = os.environ["TENANT_TOKEN_USAGE_DYNAMODB_TABLE"]
 
+# Prefix of the Parameter Store path holding each tenant's API Gateway key.
+tenant_parameter_prefix = os.environ.get(
+    "TENANT_PARAMETER_PREFIX", "/saas-genai-workshop/tenant"
+)
+
+ssm = boto3.client('ssm')
+
+# Applied to every outbound HTTP call this authorizer makes. It runs in front of
+# every request, so a hung dependency must become a fast deny rather than a
+# stalled invocation.
+HTTP_TIMEOUT_SECONDS = 5
+
 logger = Logger()
 
 def lambda_handler(event, context):
     method_arn = event["methodArn"]
 
     # get JWT token after Bearer from authorization
-    # Check if authorizationToken is present in the headers
+    #
+    # These deny rather than raise. A raised exception in a request authorizer
+    # surfaces as a 500, and an absent or malformed Authorization header is the
+    # most ordinary failure this function sees, not an internal error. Every
+    # other failure below returns an explicit deny, so these do too.
     if 'authorizationToken' in event:
         token_str = event['authorizationToken']
-    elif 'Authorization' in event['headers']:
+    elif 'Authorization' in (event.get('headers') or {}):
         token_str = event['headers']['Authorization']
     else:
-        raise Exception('Authorization token is missing')
+        logger.error('Request carries no authorization token')
+        return authorizer_layer.create_auth_denied_policy(method_arn)
 
+    # Exactly two parts: a bare "Bearer" used to raise IndexError below, and a
+    # JWT never contains a space, so anything else is malformed.
     token = token_str.split(" ")
-    if (token[0] != 'Bearer'):
-        raise Exception('Authorization header should have a format Bearer <JWT> Token')
+    if len(token) != 2 or token[0] != 'Bearer':
+        logger.error('Authorization header is not of the form "Bearer <token>"')
+        return authorizer_layer.create_auth_denied_policy(method_arn)
     jwt_bearer_token = token[1]
 
-    # only to get tenant id to get user pool info
-    unauthorized_claims = jwt.get_unverified_claims(jwt_bearer_token)
-    logger.info(unauthorized_claims)
+    # No unverified decode here. It used to decode the claims before any
+    # validation, which raised JWTError on a malformed token and surfaced as a
+    # 5xx rather than a deny. Its result was never used, and validateJWT below
+    # already rejects an undecodable token and returns False, which denies. So
+    # the token is only ever decoded as part of validating it.
 
     # get keys for tenant user pool to validate
     keys_url = 'https://cognito-idp.{}.amazonaws.com/{}/.well-known/jwks.json'.format(region, userpool_id)
-    with urllib.request.urlopen(keys_url) as f:
-        response = f.read()
-    keys = json.loads(response.decode('utf-8'))['keys']
+    try:
+        # Timeout, and fail closed. Without a timeout a stalled connection does
+        # not raise: it blocks until the Lambda's own 60s limit and returns a
+        # 5xx instead of the deny this is supposed to produce.
+        with urllib.request.urlopen(keys_url, timeout=HTTP_TIMEOUT_SECONDS) as f:
+            response = f.read()
+        keys = json.loads(response.decode('utf-8'))['keys']
+    except (urllib.error.URLError, TimeoutError, UnicodeDecodeError,
+            json.JSONDecodeError, KeyError) as e:
+        logger.error(f'Unable to read the user pool signing keys: {type(e).__name__}')
+        return authorizer_layer.create_auth_denied_policy(method_arn)
 
     # authenticate against cognito user pool using the key
     response = authorizer_layer.validateJWT(jwt_bearer_token, appclient_id, keys)
-    logger.info(response)
-    
+
     # get authenticated claims
     if (response == False):
         logger.error('Unauthorized')
         return authorizer_layer.create_auth_denied_policy(method_arn)
     else:
-        tenant_id = response["custom:tenantId"]
+        # A token can be validly signed by this pool and still carry no tenant
+        # id — a user created outside the provisioning path has no such claim.
+        # Reading it directly would raise KeyError and surface as a 5xx instead
+        # of the deny every other failure in this handler returns.
+        tenant_id = response.get("custom:tenantId")
+        if not tenant_id:
+            logger.error('Token carries no tenantId claim')
+            return authorizer_layer.create_auth_denied_policy(method_arn)
+
         response_url = urllib.request.Request(control_plane_gw_url + f'tenant-config?tenantId={tenant_id}')
-        with urllib.request.urlopen(response_url) as f:
-            response_data = f.read()
-        try:    
+        try:
+            # The request itself is inside the try, not just the parsing. An
+            # unknown or not-yet-provisioned tenant makes the control plane
+            # answer 404, which urlopen raises as HTTPError — the most likely
+            # failure here, and the one a spoofed tenantId would produce.
+            # Leaving it outside would turn that into an unhandled Lambda error
+            # instead of the deny this is meant to return.
+            with urllib.request.urlopen(response_url, timeout=HTTP_TIMEOUT_SECONDS) as f:
+                response_data = f.read()
             response_text = response_data.decode('utf-8')
             response_json = json.loads(response_text)
-            api_key = response_json['apiKey']
             tenant_name=response_json['tenantName']
             knowledge_base_id = response_json["knowledgeBaseId"]
             input_tokens = response_json["inputTokens"]
             output_tokens = response_json["outputTokens"]
-        except UnicodeDecodeError:
-            print('Unable to decode response data')
-        except KeyError:
-            print('API Key not found in response')
-        
+        except (urllib.error.URLError, TimeoutError, UnicodeDecodeError,
+                json.JSONDecodeError, KeyError) as e:
+            # Fail closed. Without a tenant config there is nothing to scope
+            # this caller to, so denying is the only safe outcome.
+            # URLError is HTTPError's base class, so this covers both. A read
+            # timeout can surface as a bare TimeoutError rather than wrapped in
+            # URLError, so both are caught.
+            logger.error(f'Unable to read tenant config: {type(e).__name__}')
+            return authorizer_layer.create_auth_denied_policy(method_arn)
+
+        # The API key is a credential, so it is deliberately NOT part of the
+        # tenant config: /tenant-config is served to anonymous callers. It is
+        # read here from Parameter Store using this function's own IAM role.
+        api_key = __get_tenant_api_key(tenant_id)
+        if api_key is None:
+            logger.error('Unable to read the tenant API key')
+            return authorizer_layer.create_auth_denied_policy(method_arn)
+
         # TODO: Lab3 - Enable tenant token usage 
         
         # assume role
@@ -101,10 +157,27 @@ def lambda_handler(event, context):
             api_key
         )
         
-        logger.debug(authorization_success_policy)
+        # Deliberately not logging the policy: it carries the temporary AWS
+        # credentials just minted for this caller plus the tenant API key.
         logger.info("Authorization succeeded")
         return authorization_success_policy
-    
+
+
+def __get_tenant_api_key(tenant_id):
+    """Read this tenant's API Gateway key from Parameter Store.
+
+    Returns None when the parameter cannot be read, so the caller can deny.
+    """
+    parameter_name = f'{tenant_parameter_prefix}/{tenant_id}/api-key'
+    try:
+        parameter = ssm.get_parameter(Name=parameter_name, WithDecryption=True)
+        return parameter['Parameter']['Value']
+    except Exception as e:
+        # Logging the parameter name but never the value.
+        logger.error(f"Error reading {parameter_name}: {type(e).__name__}")
+        return None
+
+
 
 def __is_tenant_token_limit_exceeded(tenant_id, input_tokens, output_tokens):
     # check if tenant has enough tokens
