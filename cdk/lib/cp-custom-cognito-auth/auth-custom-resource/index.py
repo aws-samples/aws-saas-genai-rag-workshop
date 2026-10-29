@@ -63,8 +63,10 @@ def __store_password(user_name, password):
         Overwrite=True
     )
     # Neither the value nor the name: the name embeds the administrator's email
-    # address, and folding '@' and '.' to '_' does not stop it identifying the
-    # person. README.md documents how to look the parameter up.
+    # address, and folding '@' to '_' does not stop it identifying the person --
+    # the dot is permitted in a parameter name and is left as-is, so
+    # 'admin@example.com' becomes 'admin_example.com'. README.md documents how to
+    # look the parameter up.
     print('Stored control plane admin password in Parameter Store')
     return parameter_name
 

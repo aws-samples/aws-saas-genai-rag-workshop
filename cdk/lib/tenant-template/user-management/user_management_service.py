@@ -68,8 +68,10 @@ def __store_password(tenant_id, username, password):
         Overwrite=True
     )
     # Neither the value nor the name: the name embeds the user's email address,
-    # and folding '@' and '.' to '_' does not stop it identifying the person.
-    # README.md documents how to look the parameter up.
+    # and folding '@' to '_' does not stop it identifying the person -- the dot
+    # is permitted in a parameter name and is left as-is, so 'alice@example.com'
+    # becomes 'alice_example.com'. README.md documents how to look the parameter
+    # up.
     print(f'Stored password for a user of tenant {tenant_id} in Parameter Store')
     return parameter_name
 
